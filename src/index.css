@@ -1,20 +1,25 @@
 :root {
   font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  color: #1d2522;
-  background: #f3efe7;
+  color: #f3f0e8;
+  background: #101512;
+  color-scheme: dark;
+  accent-color: #d8a548;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #1d2522;
-  --muted: #6d746f;
-  --line: #d9d1c2;
-  --paper: #fffdf8;
-  --field: #f8f5ed;
-  --green: #174f43;
-  --green-2: #227b68;
-  --gold: #d79d35;
-  --red: #b34035;
-  --shadow: 0 18px 50px rgba(47, 40, 29, 0.12);
+  --ink: #f3f0e8;
+  --muted: #a8b3ad;
+  --line: #33423a;
+  --paper: #151c18;
+  --field: #202923;
+  --surface: #1a231e;
+  --surface-strong: #243129;
+  --green: #3fb28f;
+  --green-2: #67d4b4;
+  --gold: #d8a548;
+  --red: #f07868;
+  --button-text: #09130f;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
 }
 
 * {
@@ -24,10 +29,14 @@
 body {
   margin: 0;
   min-width: 320px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(63, 178, 143, 0.12), transparent 30%),
+    var(--paper);
 }
 
 button,
 input,
+textarea,
 select {
   font: inherit;
 }
@@ -43,7 +52,7 @@ button,
   border: 0;
   border-radius: 999px;
   background: var(--green);
-  color: #fffdf8;
+  color: var(--button-text);
   font-weight: 700;
   cursor: pointer;
 }
@@ -59,6 +68,7 @@ button:disabled {
 }
 
 input,
+textarea,
 select {
   min-height: 42px;
   width: 100%;
@@ -67,6 +77,15 @@ select {
   border-radius: 12px;
   background: var(--field);
   color: var(--ink);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #7f8c85;
 }
 
 h1,

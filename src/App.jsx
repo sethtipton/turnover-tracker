@@ -2,17 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   ClipboardList,
   Hammer,
   LogOut,
   Mic,
   Paperclip,
+  Pencil,
   Plus,
   ShieldCheck,
   ShoppingCart,
   Trash2,
 } from "lucide-react";
 import "./App.css";
+import { draftTasksFromDictation } from "./lib/ai";
 import {
   addItem,
   deleteAttachment,
@@ -33,7 +36,6 @@ import { isSupabaseConfigured } from "./lib/supabase";
 
 const emptyDraft = {
   title: "",
-  category: "Prep",
   note: "",
   kind: "task",
   material_type: "shopping",
@@ -53,6 +55,7 @@ function App() {
   const [mediaUrls, setMediaUrls] = useState({});
   const [dictationState, setDictationState] = useState("idle");
   const [recordings, setRecordings] = useState([]);
+  const [workMode, setWorkMode] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
@@ -140,7 +143,9 @@ function App() {
     });
   }, [items, query, statusFilter]);
 
-  const taskItems = visibleItems.filter((item) => item.kind === "task" || item.kind === "dictation");
+  const taskItems = workMode
+    ? items.filter((item) => item.status === "approved" && (item.kind === "task" || item.kind === "dictation"))
+    : visibleItems.filter((item) => item.kind === "task" || item.kind === "dictation");
   const shoppingItems = visibleItems.filter((item) => item.kind === "material" && item.material_type === "shopping");
   const collectItems = visibleItems.filter((item) => item.kind === "material" && item.material_type === "collect");
   const pendingCount = items.filter((item) => item.status === "pending-review").length;
@@ -162,7 +167,7 @@ function App() {
         workspace_id: workspace.id,
         unit_id: selectedUnitId,
         title,
-        category: draft.kind === "material" ? MATERIAL_LABELS[draft.material_type] : draft.category,
+        category: draft.kind === "material" ? MATERIAL_LABELS[draft.material_type] : "Task",
         note: draft.note.trim(),
         kind: draft.kind,
         material_type: draft.kind === "material" ? draft.material_type : null,
@@ -185,6 +190,28 @@ function App() {
         status,
         completed_at: status === "done" ? new Date().toISOString() : null,
       });
+      await reloadSelectedItems();
+    } catch (error) {
+      setMessage(error.message);
+      await reloadSelectedItems();
+    }
+  }
+
+  async function handleItemChange(item, patch) {
+    const nextPatch = {
+      title: patch.title?.trim(),
+      note: patch.note?.trim() || "",
+      status: patch.status,
+      material_type: item.kind === "material" ? patch.material_type : null,
+      category: item.kind === "material" ? MATERIAL_LABELS[patch.material_type] : item.category || "Task",
+      completed_at: patch.status === "done" ? item.completed_at || new Date().toISOString() : null,
+    };
+
+    if (!nextPatch.title) return;
+
+    setItems((current) => current.map((candidate) => (candidate.id === item.id ? { ...candidate, ...nextPatch } : candidate)));
+    try {
+      await updateItem(item.id, nextPatch);
       await reloadSelectedItems();
     } catch (error) {
       setMessage(error.message);
@@ -280,18 +307,30 @@ function App() {
         unit_id: selectedUnitId,
         title: "Dictated property update",
         category: "Dictation",
-        note: "Raw recording saved. AI extraction is not wired yet.",
+        note: "Raw recording saved. AI extraction queued.",
         kind: "dictation",
         status: "pending-review",
         sort_order: items.length + 1,
       });
-      await uploadAttachment({
+      const attachment = await uploadAttachment({
         workspaceId: workspace.id,
         unitId: selectedUnitId,
         itemId: dictationItem.id,
         file: recording.file,
         kind: "audio",
       });
+      try {
+        setMessage("Recording saved. Drafting pending tasks...");
+        const draftResult = await draftTasksFromDictation({
+          unitId: selectedUnitId,
+          dictationItemId: dictationItem.id,
+          attachmentId: attachment.id,
+        });
+        const draftCount = draftResult?.items?.length || 0;
+        setMessage(draftCount > 0 ? `Created ${draftCount} pending review item${draftCount === 1 ? "" : "s"}.` : "Recording saved, but no draft items were found.");
+      } catch (aiError) {
+        setMessage(`Recording saved, but AI drafting could not run: ${aiError.message}`);
+      }
       setRecordings((current) => current.filter((item) => item.id !== recording.id));
       await reloadSelectedItems();
     } catch (error) {
@@ -321,36 +360,47 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${workMode ? "work-mode" : ""}`}>
       <header className="app-header">
         <div>
           <p className="eyebrow">Turnover Tracker</p>
           <h1>{selectedUnit?.name || "Select a unit"}</h1>
         </div>
         <div className="header-actions">
-          <button className={dictationState === "recording" ? "recording" : ""} type="button" onClick={dictationState === "recording" ? stopDictation : startDictation}>
-            <Mic size={18} />
-            {dictationState === "recording" ? "Stop" : "Dictate Tasks"}
+          {!workMode && (
+            <button className={dictationState === "recording" ? "recording" : ""} type="button" onClick={dictationState === "recording" ? stopDictation : startDictation}>
+              <Mic size={18} />
+              {dictationState === "recording" ? "Stop" : "Dictate Tasks"}
+            </button>
+          )}
+          <button className={workMode ? "work-mode-button active" : "work-mode-button"} type="button" onClick={() => setWorkMode((current) => !current)} aria-pressed={workMode}>
+            <ClipboardList size={17} />
+            Work Mode
           </button>
-          <button className="ghost" type="button" onClick={signOut}>
-            <LogOut size={17} />
-            Sign out
-          </button>
+          {!workMode && (
+            <button className="ghost" type="button" onClick={signOut}>
+              <LogOut size={17} />
+              Sign out
+            </button>
+          )}
         </div>
       </header>
 
-      <section className="unit-strip" aria-label="Units">
-        {units.map((unit) => (
-          <button
-            className={unit.id === selectedUnitId ? "unit-pill active" : "unit-pill"}
-            key={unit.id}
-            type="button"
-            onClick={() => setSelectedUnitId(unit.id)}
+      {!workMode && (
+        <section className="unit-select-bar" aria-label="Units">
+          <label htmlFor="unit-select">Property</label>
+          <select
+            id="unit-select"
+            name="unit"
+            value={selectedUnitId}
+            onChange={(event) => setSelectedUnitId(event.target.value)}
           >
-            {unit.name}
-          </button>
-        ))}
-      </section>
+            {units.map((unit) => (
+              <option key={unit.id} value={unit.id}>{unit.name}</option>
+            ))}
+          </select>
+        </section>
+      )}
 
       <section className="summary-grid" aria-label="Unit summary">
         <Metric label="Approved" value={items.filter((item) => item.status === "approved").length} />
@@ -359,17 +409,19 @@ function App() {
         <Metric label="Shopping" value={items.filter((item) => item.material_type === "shopping").length} />
       </section>
 
-      <section className="control-bar">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tasks, notes, materials..." />
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="all">All statuses</option>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </section>
+      {!workMode && (
+        <section className="control-bar">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tasks, notes, materials..." />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </section>
+      )}
 
-      {recordings.length > 0 && (
+      {!workMode && recordings.length > 0 && (
         <section className="panel">
           <div className="panel-title">
             <h2>Dictation Inbox</h2>
@@ -389,38 +441,42 @@ function App() {
         </section>
       )}
 
-      <section className="panel add-panel">
-        <div>
-          <h2>Add Work</h2>
-          <p>Create approved tasks, shopping items, or collect/bring reminders.</p>
-        </div>
-        <form className="add-form" onSubmit={handleAddItem}>
-          <select value={draft.kind} onChange={(event) => setDraft((current) => ({ ...current, kind: event.target.value }))}>
-            <option value="task">Task</option>
-            <option value="material">Material</option>
-          </select>
-          {draft.kind === "task" ? (
-            <input value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Category" />
-          ) : (
-            <select value={draft.material_type} onChange={(event) => setDraft((current) => ({ ...current, material_type: event.target.value }))}>
-              <option value="shopping">Shopping List</option>
-              <option value="collect">Collect / Bring</option>
+      {!workMode && (
+        <section className="panel add-panel">
+          <div>
+            <h2>Add Work</h2>
+            <p>Create approved tasks, shopping items, or collect/bring reminders.</p>
+          </div>
+          <form className={draft.kind === "material" ? "add-form has-material-type" : "add-form"} onSubmit={handleAddItem}>
+            <select value={draft.kind} onChange={(event) => setDraft((current) => ({ ...current, kind: event.target.value }))}>
+              <option value="task">Task</option>
+              <option value="material">Material</option>
             </select>
-          )}
-          <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="+ Quick add item..." />
-          <input value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} placeholder="Optional note" />
-          <button disabled={busy || !selectedUnitId} type="submit"><Plus size={17} /> Add</button>
-        </form>
-      </section>
+            {draft.kind === "material" && (
+              <select value={draft.material_type} onChange={(event) => setDraft((current) => ({ ...current, material_type: event.target.value }))}>
+                <option value="shopping">Shopping List</option>
+                <option value="collect">Collect / Bring</option>
+              </select>
+            )}
+            <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="+ Quick add item..." />
+            <input value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} placeholder="Optional note" />
+            <button disabled={busy || !selectedUnitId} type="submit"><Plus size={17} /> Add</button>
+          </form>
+        </section>
+      )}
 
-      {message && (
+      {!workMode && message && (
         <p className="message"><AlertCircle size={17} /> {message}</p>
       )}
 
       <section className="work-grid">
-        <ItemColumn title="Tasks" icon={<ClipboardList size={18} />} items={taskItems} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-        <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} />} items={shoppingItems} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-        <ItemColumn title="Collect / Bring" icon={<Hammer size={18} />} items={collectItems} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+        {!workMode && (
+          <div className="materials-row">
+            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} />} items={shoppingItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+            <ItemColumn title="Collect / Bring" icon={<Hammer size={18} />} items={collectItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+          </div>
+        )}
+        <ItemColumn title="Tasks" icon={<ClipboardList size={18} />} items={taskItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
       </section>
     </main>
   );
@@ -435,10 +491,6 @@ function getAttachmentKind(file, fallback = "file") {
 function LandingPage({ onSignIn, setupMissing = false }) {
   return (
     <main className="landing">
-      <nav>
-        <strong>Turnover Tracker</strong>
-        <button type="button" onClick={onSignIn} disabled={setupMissing}>Sign in with Google</button>
-      </nav>
       <section className="hero-section">
         <div className="hero-copy">
           <p className="eyebrow">Rental turnover command center</p>
@@ -474,14 +526,32 @@ function Metric({ label, value }) {
   );
 }
 
-function ItemColumn({ title, icon, items, onStatus, onDelete, onUpload, onDeleteAttachment, mediaUrls }) {
+function ItemColumn({ title, icon, items, onItemChange, onStatus, onDelete, onUpload, onDeleteAttachment, mediaUrls, forceOpen = false, compact = false }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const panelId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-items`;
+  const isOpen = forceOpen || !isCollapsed;
+
   return (
-    <section className="panel item-column">
+    <section className={`panel item-column ${isOpen ? "" : "is-collapsed"} ${compact ? "compact" : ""}`}>
       <div className="panel-title">
-        <h2>{icon}{title}</h2>
+        <h2>
+          <button
+            className="panel-toggle"
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls={panelId}
+            onClick={() => {
+              if (!forceOpen) setIsCollapsed((current) => !current);
+            }}
+          >
+            <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
+            {icon}
+            <span>{title}</span>
+          </button>
+        </h2>
         <span>{items.length}</span>
       </div>
-      <div className="item-list">
+      <div className="item-list" id={panelId} hidden={!isOpen}>
         {items.length === 0 ? (
           <p className="empty">Nothing here yet.</p>
         ) : (
@@ -492,26 +562,27 @@ function ItemColumn({ title, icon, items, onStatus, onDelete, onUpload, onDelete
                   {item.status === "done" && <Check size={15} />}
                 </button>
                 <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.category}{item.note ? ` - ${item.note}` : ""}</p>
+                  <EditableItem item={item} onSave={onItemChange} compact={compact} />
                 </div>
               </div>
-              <div className="item-actions">
-                <select value={item.status} onChange={(event) => onStatus(item, event.target.value)}>
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-                <label className="attach-button">
-                  <Paperclip size={15} />
-                  Attach
-                  <input type="file" accept="image/*,audio/*" multiple onChange={(event) => onUpload(item, event.target.files, "file")} />
-                </label>
-                <button className="icon-button" type="button" onClick={() => onDelete(item)} aria-label={`Delete ${item.title}`}>
-                  <Trash2 size={15} />
-                </button>
-              </div>
-              {item.attachments?.length > 0 && (
+              {!compact && (
+                <div className="item-actions">
+                  <select value={item.status} onChange={(event) => onStatus(item, event.target.value)}>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <label className="attach-button">
+                    <Paperclip size={15} />
+                    Attach
+                    <input type="file" accept="image/*,audio/*" multiple onChange={(event) => onUpload(item, event.target.files, "file")} />
+                  </label>
+                  <button className="icon-button" type="button" onClick={() => onDelete(item)} aria-label={`Delete ${item.title}`}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )}
+              {!compact && item.attachments?.length > 0 && (
                 <div className="attachments">
                   {item.attachments.map((attachment) => (
                     <Attachment key={attachment.id} attachment={attachment} url={mediaUrls[attachment.storage_path]} onDelete={onDeleteAttachment} />
@@ -524,6 +595,111 @@ function ItemColumn({ title, icon, items, onStatus, onDelete, onUpload, onDelete
       </div>
     </section>
   );
+}
+
+function EditableItem({ item, onSave, compact = false }) {
+  const [draft, setDraft] = useState(() => getItemEditDraft(item));
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    setDraft(getItemEditDraft(item));
+  }, [item]);
+
+  function saveItem(event) {
+    event?.preventDefault();
+    const nextTitle = draft.title.trim();
+    if (!nextTitle) {
+      setDraft(getItemEditDraft(item));
+      return;
+    }
+    onSave(item, {
+      ...draft,
+      title: nextTitle,
+    });
+    setIsEditing(false);
+  }
+
+  function cancelEdit() {
+    setDraft(getItemEditDraft(item));
+    setIsEditing(false);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter") {
+      saveItem(event);
+    }
+
+    if (event.key === "Escape") {
+      cancelEdit();
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div className="item-summary">
+        <div className="item-title-row">
+          <h3>{item.title}</h3>
+          <button className="icon-button edit-title-button" type="button" onClick={() => setIsEditing(true)} aria-label={`Edit ${item.title}`}>
+            <Pencil size={14} />
+          </button>
+        </div>
+        {!compact && item.note && <p>{item.note}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <form className="item-editor" onSubmit={saveItem}>
+      <label>
+        <span>Title</span>
+        <input
+          className="item-title-input"
+          value={draft.title}
+          onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+          onKeyDown={handleKeyDown}
+          aria-label={`Edit title for ${item.title}`}
+          autoFocus
+        />
+      </label>
+      {item.kind === "material" && (
+        <label>
+          <span>List</span>
+          <select
+            value={draft.material_type || "shopping"}
+            onChange={(event) => setDraft((current) => ({ ...current, material_type: event.target.value }))}
+          >
+            <option value="shopping">Shopping List</option>
+            <option value="collect">Collect / Bring</option>
+          </select>
+        </label>
+      )}
+      <label>
+        <span>Status</span>
+        <select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="editor-note">
+        <span>Note</span>
+        <textarea value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={3} />
+      </label>
+      <div className="title-edit-actions">
+        <button type="submit">Save</button>
+        <button className="ghost" type="button" onClick={cancelEdit}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+function getItemEditDraft(item) {
+  return {
+    title: item.title || "",
+    note: item.note || "",
+    material_type: item.material_type || "shopping",
+    status: item.status || "approved",
+  };
 }
 
 function Attachment({ attachment, url, onDelete }) {

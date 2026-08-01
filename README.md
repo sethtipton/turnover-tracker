@@ -46,6 +46,52 @@ https://gholbnyvijfyqdwqgjan.supabase.co
 
 Google auth is configured for the hosted app and local Vite development. While the Google OAuth app is in testing mode, family accounts must be listed as Google test users before they can sign in.
 
+## OpenAI Credential Setup
+
+Do not put an OpenAI API key in any `VITE_` environment variable. Vite variables are bundled into the public browser app, so the key must stay server-side.
+
+The app uses a Supabase Edge Function at `supabase/functions/draft-tasks` to keep OpenAI calls server-side. It reads:
+
+```text
+SUPABASE_URL
+SUPABASE_ANON_KEY
+OPENAI_API_KEY
+OPENAI_MODEL
+OPENAI_TRANSCRIPTION_MODEL
+```
+
+For local Supabase function development:
+
+```bash
+cp supabase/.env.example supabase/.env
+```
+
+Then replace the placeholder values in `supabase/.env`.
+
+For hosted Supabase:
+
+```bash
+supabase secrets set OPENAI_API_KEY="your-real-key" OPENAI_MODEL="gpt-4.1-mini" OPENAI_TRANSCRIPTION_MODEL="gpt-4o-transcribe" --project-ref gholbnyvijfyqdwqgjan
+supabase functions deploy draft-tasks --project-ref gholbnyvijfyqdwqgjan
+```
+
+For GitHub-managed deployment, add these repository secrets in GitHub > Settings > Secrets and variables > Actions:
+
+```text
+SUPABASE_ACCESS_TOKEN
+SUPABASE_PROJECT_REF
+OPENAI_API_KEY
+```
+
+Optionally add this repository variable:
+
+```text
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+```
+
+Then run the manual `Deploy Supabase Functions` workflow from the GitHub Actions tab. The function transcribes saved dictation audio, creates pending-review tasks/materials from the transcript, and stores the transcript on the original dictation item.
+
 ## Deploy
 
 The app is configured for GitHub Pages at:
