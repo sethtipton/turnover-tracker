@@ -1,0 +1,77 @@
+:root {
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color: #1d2522;
+  background: #f3efe7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #1d2522;
+  --muted: #6d746f;
+  --line: #d9d1c2;
+  --paper: #fffdf8;
+  --field: #f8f5ed;
+  --green: #174f43;
+  --green-2: #227b68;
+  --gold: #d79d35;
+  --red: #b34035;
+  --shadow: 0 18px 50px rgba(47, 40, 29, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+.attach-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fffdf8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover,
+.attach-button:hover {
+  background: var(--green-2);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input,
+select {
+  min-height: 42px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
