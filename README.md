@@ -44,7 +44,7 @@ https://gholbnyvijfyqdwqgjan.supabase.co
      - `https://sethtipton.github.io`
 6. Copy the project URL and publishable key into `.env.local`.
 
-Google auth is intentionally the remaining manual setup step because Supabase requires a Google OAuth Client ID and Client Secret.
+Google auth is configured for the hosted app and local Vite development. While the Google OAuth app is in testing mode, family accounts must be listed as Google test users before they can sign in.
 
 ## Deploy
 
