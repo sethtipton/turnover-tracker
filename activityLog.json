@@ -1,0 +1,178 @@
+[
+  {
+    "id": "d0b74c3c-db2e-4828-a808-5914e9d60935",
+    "unitId": "451-upstairs",
+    "taskId": "final-cleaning-general-unit-cleaning",
+    "taskText": "General unit cleaning",
+    "room": "Final Cleaning",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:44.903Z",
+    "order": 1
+  },
+  {
+    "id": "3f8cfa9d-d2fd-49fb-8a9f-0571fd58f1e1",
+    "unitId": "451-upstairs",
+    "taskId": "final-cleaning-deep-clean-kitchen",
+    "taskText": "Deep clean kitchen",
+    "room": "Final Cleaning",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:43.112Z",
+    "order": 2
+  },
+  {
+    "id": "362a8c55-9771-4f20-9ef0-b69772cd18b4",
+    "unitId": "451-upstairs",
+    "taskId": "final-cleaning-clean-light-fixtures",
+    "taskText": "Clean light fixtures",
+    "room": "Final Cleaning",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:42.044Z",
+    "order": 3
+  },
+  {
+    "id": "ca024b7c-e7b1-4544-b1d2-89eabb52e4f7",
+    "unitId": "451-upstairs",
+    "taskId": "final-cleaning-clean-closets-and-shelves",
+    "taskText": "Clean closets and shelves",
+    "room": "Final Cleaning",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:35.345Z",
+    "order": 4
+  },
+  {
+    "id": "18a5d998-3497-46ef-bab7-79487190b137",
+    "unitId": "451-upstairs",
+    "taskId": "final-cleaning-clean-trim",
+    "taskText": "Clean trim",
+    "room": "Final Cleaning",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:31.372Z",
+    "order": 5
+  },
+  {
+    "id": "898a21ba-cd93-45f5-b074-d68011ba6c32",
+    "unitId": "451-upstairs",
+    "taskId": "windows-clean-all-windows",
+    "taskText": "Clean all windows",
+    "room": "Windows",
+    "category": "Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:56:25.776Z",
+    "order": 6
+  },
+  {
+    "id": "d7b04c4c-db71-49e7-9297-8b26293457b6",
+    "unitId": "451-upstairs",
+    "taskId": "ed13d62a-7d67-4698-a36e-4b59d0d4a48a",
+    "taskText": "Find tray for microwave",
+    "room": "Kitchen",
+    "category": "Final Cleaning",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:55:47.164Z",
+    "order": 7
+  },
+  {
+    "id": "6475edac-2a29-4ebf-a6c1-ae1fe67566c8",
+    "unitId": "451-upstairs",
+    "taskId": "kitchen-paint-trim",
+    "taskText": "Paint kitchen trim",
+    "room": "Kitchen",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-08-01T04:55:20.112Z",
+    "order": 8
+  },
+  {
+    "id": "0add93b6-d793-4e98-a12b-217afd32ef81",
+    "unitId": "451-upstairs",
+    "taskId": "exterior-fix-rubbing-entry-door",
+    "taskText": "Fix and refinish rubbing entry door",
+    "room": "Exterior / Entry",
+    "category": "Prep",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:05:05.530Z",
+    "order": 9
+  },
+  {
+    "id": "9a5f03b8-ee97-4115-a5c6-dd3872377f68",
+    "unitId": "451-upstairs",
+    "taskId": "bedrooms-paint-bedroom-baseboards",
+    "taskText": "Paint bedroom baseboards",
+    "room": "Bedrooms",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:27.616Z",
+    "order": 10
+  },
+  {
+    "id": "3d5b0bd3-1cca-47f6-ac64-67b6ef1ae6f6",
+    "unitId": "451-upstairs",
+    "taskId": "living-room-touch-up-trim",
+    "taskText": "Touch up trim",
+    "room": "Living Room",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:23.393Z",
+    "order": 11
+  },
+  {
+    "id": "7730878b-4e14-43a6-bcc7-5c85a177951c",
+    "unitId": "451-upstairs",
+    "taskId": "living-room-touch-up-walls",
+    "taskText": "Touch up walls",
+    "room": "Living Room",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:22.690Z",
+    "order": 12
+  },
+  {
+    "id": "3729a8aa-9874-4677-aa4d-cac97efbd366",
+    "unitId": "451-upstairs",
+    "taskId": "walls-rinse-after-tsp",
+    "taskText": "Rinse walls after TSP wash",
+    "room": "Walls / Ceilings",
+    "category": "Prep",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:17.775Z",
+    "order": 13
+  },
+  {
+    "id": "eb2c692f-ebf2-485f-b26e-c166c963d87f",
+    "unitId": "451-upstairs",
+    "taskId": "walls-tsp-wash-before-painting",
+    "taskText": "Sponge TSP walls before painting",
+    "room": "Walls / Ceilings",
+    "category": "Prep",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:16.880Z",
+    "order": 14
+  },
+  {
+    "id": "b82357c3-0360-4b3d-86a4-970695bda019",
+    "unitId": "451-upstairs",
+    "taskId": "walls-paint-ceiling-areas",
+    "taskText": "Paint ceilings",
+    "room": "Walls / Ceilings",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:15.368Z",
+    "order": 15
+  },
+  {
+    "id": "d7b86a4c-cd7c-4635-bb68-46838b7e2d43",
+    "unitId": "451-upstairs",
+    "taskId": "walls-touch-up-trim",
+    "taskText": "Touch up trim",
+    "room": "Walls / Ceilings",
+    "category": "Painting",
+    "action": "completed",
+    "timestamp": "2026-07-30T19:04:13.759Z",
+    "order": 16
+  }
+]

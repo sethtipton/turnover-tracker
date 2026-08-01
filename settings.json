@@ -1,0 +1,42 @@
+{
+  "rooms": [
+    "Materials",
+    "Exterior / Entry",
+    "Bathroom",
+    "Kitchen",
+    "Walls / Ceilings",
+    "Living Room",
+    "Bedrooms",
+    "Doors / Hardware",
+    "Windows",
+    "Final Cleaning"
+  ],
+  "categories": [
+    "Shopping List",
+    "Materials",
+    "Prep",
+    "Plaster / Spackle",
+    "Sanding",
+    "Caulking",
+    "Painting",
+    "Hardware",
+    "Appliances",
+    "Windows",
+    "Cleaning",
+    "Final Cleaning"
+  ],
+  "categoryAccents": {
+    "Shopping List": "#f59e0b",
+    "Materials": "#64748b",
+    "Prep": "#2563eb",
+    "Plaster / Spackle": "#7c3aed",
+    "Sanding": "#a16207",
+    "Caulking": "#0f766e",
+    "Painting": "#db2777",
+    "Hardware": "#475569",
+    "Appliances": "#0891b2",
+    "Windows": "#0284c7",
+    "Cleaning": "#16a34a",
+    "Final Cleaning": "#047857"
+  }
+}
