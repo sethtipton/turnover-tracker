@@ -48,6 +48,8 @@ const emptyDraft = {
   material_type: "shopping",
 };
 
+const basePath = normalizeBasePath(import.meta.env.BASE_URL);
+
 function App() {
   const [session, setSession] = useState(null);
   const [workspace, setWorkspace] = useState(null);
@@ -63,12 +65,16 @@ function App() {
   const [dictationState, setDictationState] = useState("idle");
   const [recordings, setRecordings] = useState([]);
   const [workMode, setWorkMode] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const audioFrameRef = useRef(null);
+  const audioPeakRef = useRef(0);
 
   const userEmail = session?.user?.email?.toLowerCase();
   const isAllowed = Boolean(userEmail && ALLOWED_EMAILS.includes(userEmail));
-  const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || units[0];
+  const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -87,7 +93,7 @@ function App() {
         const unitData = await loadUnits(workspaceData.id);
         setWorkspace(workspaceData);
         setUnits(unitData);
-        setSelectedUnitId((current) => current || unitData[0]?.id || "");
+        setSelectedUnitId(getUnitIdFromCurrentPath(unitData));
       } catch (error) {
         setMessage(error.message);
       } finally {
@@ -99,7 +105,28 @@ function App() {
   }, [session, isAllowed]);
 
   useEffect(() => {
-    if (!selectedUnitId || !workspace) return;
+    return () => {
+      stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setAudioLevel);
+      mediaRecorderRef.current?.stream?.getTracks?.().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    function handlePopState() {
+      setSelectedUnitId(getUnitIdFromCurrentPath(units));
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [units]);
+
+  useEffect(() => {
+    if (!selectedUnitId || !workspace) {
+      setItems([]);
+      setMediaUrls({});
+      setWorkMode(false);
+      return;
+    }
 
     async function refreshItems() {
       setBusy(true);
@@ -151,16 +178,22 @@ function App() {
   }, [items, query, statusFilter]);
 
   const taskItems = workMode
-    ? items.filter((item) => item.status === "approved" && (item.kind === "task" || item.kind === "dictation"))
-    : visibleItems.filter((item) => item.kind === "task" || item.kind === "dictation");
+    ? items.filter((item) => item.status === "approved" && item.kind === "task")
+    : visibleItems.filter((item) => item.kind === "task");
   const shoppingItems = visibleItems.filter((item) => item.kind === "material" && item.material_type === "shopping");
   const collectItems = visibleItems.filter((item) => item.kind === "material" && item.material_type === "collect");
+  const recordingItems = visibleItems.filter((item) => item.kind === "dictation");
   const pendingCount = items.filter((item) => item.status === "pending-review").length;
   const doneCount = items.filter((item) => item.status === "done").length;
 
   async function reloadSelectedItems() {
     if (!selectedUnitId) return;
     setItems(await loadItems(selectedUnitId));
+  }
+
+  function handleUnitChange(unitId) {
+    setSelectedUnitId(unitId);
+    updateUnitPath(units.find((unit) => unit.id === unitId));
   }
 
   async function handleAddItem(event) {
@@ -286,13 +319,16 @@ function App() {
       const mimeType = getSupportedAudioMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       const startedAt = Date.now();
+      audioPeakRef.current = 0;
       chunksRef.current = [];
+      startAudioMonitor(stream, setAudioLevel, audioContextRef, audioFrameRef, audioPeakRef);
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const durationMs = Date.now() - startedAt;
+        const peakLevel = stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setAudioLevel);
         stream.getTracks().forEach((track) => track.stop());
         setDictationState("idle");
         mediaRecorderRef.current = null;
@@ -312,14 +348,16 @@ function App() {
           durationMs,
           size: blob.size,
           mimeType: blob.type,
+          peakLevel,
         }, ...current]);
-        setMessage("Recording ready. Play it back before saving if you want to confirm audio.");
+        setMessage(peakLevel < 0.015 ? "Recording ready, but no mic input was detected. Check your input device before saving." : "Recording ready. Play it back before saving if you want to confirm audio.");
       };
       mediaRecorderRef.current = recorder;
       recorder.start(1000);
       setDictationState("recording");
       setMessage("");
     } catch (error) {
+      stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setAudioLevel);
       setMessage(error.message);
       setDictationState("idle");
     }
@@ -398,19 +436,28 @@ function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">Turnover Tracker</p>
-          <h1>{selectedUnit?.name || "Select a unit"}</h1>
+          <h1>{selectedUnit?.name || "Turnover Tracker"}</h1>
         </div>
         <div className="header-actions">
-          {!workMode && (
-            <button className={dictationState === "recording" ? "recording" : ""} type="button" onClick={dictationState === "recording" ? stopDictation : startDictation}>
-              <Mic size={18} />
-              {dictationState === "recording" ? "Stop" : "Dictate Tasks"}
+          {!workMode && selectedUnit && (
+            <div className="dictation-control">
+              <button className={dictationState === "recording" ? "recording" : ""} type="button" onClick={dictationState === "recording" ? stopDictation : startDictation}>
+                <Mic size={18} />
+                {dictationState === "recording" ? "Stop" : "Dictate Tasks"}
+              </button>
+              {dictationState === "recording" && (
+                <div className="audio-meter" aria-label="Microphone input level">
+                  <span style={{ transform: `scaleX(${Math.max(0.04, audioLevel)})` }} />
+                </div>
+              )}
+            </div>
+          )}
+          {selectedUnit && (
+            <button className={workMode ? "work-mode-button active" : "work-mode-button"} type="button" onClick={() => setWorkMode((current) => !current)} aria-pressed={workMode}>
+              <ClipboardList size={17} />
+              Work Mode
             </button>
           )}
-          <button className={workMode ? "work-mode-button active" : "work-mode-button"} type="button" onClick={() => setWorkMode((current) => !current)} aria-pressed={workMode}>
-            <ClipboardList size={17} />
-            Work Mode
-          </button>
           {!workMode && (
             <button className="ghost" type="button" onClick={signOut}>
               <LogOut size={17} />
@@ -427,8 +474,9 @@ function App() {
             id="unit-select"
             name="unit"
             value={selectedUnitId}
-            onChange={(event) => setSelectedUnitId(event.target.value)}
+            onChange={(event) => handleUnitChange(event.target.value)}
           >
+            <option value="">Select a property</option>
             {units.map((unit) => (
               <option key={unit.id} value={unit.id}>{unit.name}</option>
             ))}
@@ -436,14 +484,21 @@ function App() {
         </section>
       )}
 
-      <section className="summary-grid" aria-label="Unit summary">
-        <Metric label="Approved" value={items.filter((item) => item.status === "approved").length} />
-        <Metric label="Pending Review" value={pendingCount} />
-        <Metric label="Done" value={doneCount} />
-        <Metric label="Shopping" value={items.filter((item) => item.material_type === "shopping").length} />
-      </section>
+      {selectedUnit ? (
+        <section className="summary-grid" aria-label="Unit summary">
+          <Metric label="Approved" value={items.filter((item) => item.status === "approved").length} />
+          <Metric label="Pending Review" value={pendingCount} />
+          <Metric label="Done" value={doneCount} />
+          <Metric label="Shopping" value={items.filter((item) => item.material_type === "shopping").length} />
+        </section>
+      ) : (
+        <section className="panel empty-unit-panel">
+          <h2>Select a property</h2>
+          <p>Choose a property above to view its tasks, shopping list, collect/bring items, and recordings.</p>
+        </section>
+      )}
 
-      {!workMode && (
+      {!workMode && selectedUnit && (
         <section className="control-bar">
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tasks, notes, materials..." />
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -455,7 +510,7 @@ function App() {
         </section>
       )}
 
-      {!workMode && recordings.length > 0 && (
+      {!workMode && selectedUnit && recordings.length > 0 && (
         <section className="panel">
           <div className="panel-title">
             <h2>Dictation Inbox</h2>
@@ -468,6 +523,7 @@ function App() {
                 <p>
                   {formatDuration(recording.durationMs)} / {formatBytes(recording.size)}
                   {recording.mimeType ? ` / ${recording.mimeType}` : ""}
+                  {typeof recording.peakLevel === "number" ? ` / mic ${Math.round(recording.peakLevel * 100)}%` : ""}
                 </p>
                 <div className="recording-actions">
                   <button type="button" onClick={() => saveRecording(recording)}>Save to {selectedUnit?.name}</button>
@@ -479,7 +535,7 @@ function App() {
         </section>
       )}
 
-      {!workMode && (
+      {!workMode && selectedUnit && (
         <section className="panel add-panel">
           <div>
             <h2>Add Work</h2>
@@ -507,15 +563,20 @@ function App() {
         <p className="message"><AlertCircle size={17} /> {message}</p>
       )}
 
-      <section className="work-grid">
-        {!workMode && (
-          <div className="materials-row">
-            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} />} items={shoppingItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-            <ItemColumn title="Collect / Bring" icon={<Hammer size={18} />} items={collectItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-          </div>
-        )}
-        <ItemColumn title="Tasks" icon={<ClipboardList size={18} />} items={taskItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
-      </section>
+      {selectedUnit && (
+        <section className="work-grid">
+          {!workMode && (
+            <div className="materials-row">
+              <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} />} items={shoppingItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+              <ItemColumn title="Collect / Bring" icon={<Hammer size={18} />} items={collectItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+            </div>
+          )}
+          <ItemColumn title="Tasks" icon={<ClipboardList size={18} />} items={taskItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
+          {!workMode && (
+            <ItemColumn title="Recordings" icon={<Mic size={18} />} items={recordingItems} onItemChange={handleItemChange} onStatus={handleStatusChange} onDelete={handleDeleteItem} onUpload={handleFileUpload} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+          )}
+        </section>
+      )}
     </main>
   );
 }
@@ -524,6 +585,38 @@ function getAttachmentKind(file, fallback = "file") {
   if (file.type.startsWith("image/")) return "photo";
   if (file.type.startsWith("audio/")) return "audio";
   return fallback;
+}
+
+function normalizeBasePath(path) {
+  if (!path || path === "/") return "/";
+  return path.endsWith("/") ? path : `${path}/`;
+}
+
+function getUnitSlug(unit) {
+  return unit.name
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getCurrentUnitSlug() {
+  const path = window.location.pathname;
+  if (!path.startsWith(basePath)) return "";
+  return decodeURIComponent(path.slice(basePath.length).replace(/^\/+|\/+$/g, ""));
+}
+
+function getUnitIdFromCurrentPath(units) {
+  const routeSlug = getCurrentUnitSlug().toLowerCase();
+  if (!routeSlug) return "";
+  return units.find((unit) => getUnitSlug(unit).toLowerCase() === routeSlug)?.id || "";
+}
+
+function updateUnitPath(unit) {
+  const nextPath = unit ? `${basePath}${encodeURIComponent(getUnitSlug(unit))}` : basePath;
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (currentPath === nextPath) return;
+  window.history.pushState({}, "", nextPath);
 }
 
 function getSupportedAudioMimeType() {
@@ -536,6 +629,55 @@ function getAudioExtension(mimeType) {
   if (mimeType.includes("mpeg")) return "mp3";
   if (mimeType.includes("wav")) return "wav";
   return "webm";
+}
+
+function startAudioMonitor(stream, setAudioLevel, audioContextRef, audioFrameRef, audioPeakRef) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const audioContext = new AudioContextClass();
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 2048;
+  const source = audioContext.createMediaStreamSource(stream);
+  const samples = new Uint8Array(analyser.fftSize);
+  source.connect(analyser);
+  audioContextRef.current = audioContext;
+
+  let lastUpdate = 0;
+  function tick(timestamp) {
+    analyser.getByteTimeDomainData(samples);
+    let sum = 0;
+    for (const sample of samples) {
+      const centered = (sample - 128) / 128;
+      sum += centered * centered;
+    }
+
+    const rms = Math.sqrt(sum / samples.length);
+    const level = Math.min(1, rms * 8);
+    audioPeakRef.current = Math.max(audioPeakRef.current, level);
+    if (timestamp - lastUpdate > 90) {
+      setAudioLevel(level);
+      lastUpdate = timestamp;
+    }
+
+    audioFrameRef.current = requestAnimationFrame(tick);
+  }
+
+  audioFrameRef.current = requestAnimationFrame(tick);
+}
+
+function stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setAudioLevel) {
+  const peakLevel = audioPeakRef.current;
+  if (audioFrameRef.current) {
+    cancelAnimationFrame(audioFrameRef.current);
+    audioFrameRef.current = null;
+  }
+
+  audioContextRef.current?.close?.();
+  audioContextRef.current = null;
+  audioPeakRef.current = 0;
+  setAudioLevel(0);
+  return peakLevel;
 }
 
 function formatDuration(durationMs = 0) {
@@ -567,8 +709,8 @@ function LandingPage({ onSignIn, setupMissing = false }) {
         </div>
         <div className="hero-board" aria-label="Product preview">
           <div className="board-topline">
-            <span>451 Upstairs</span>
-            <span>Pending Review: 3</span>
+            <span>No property selected</span>
+            <span>Pick a unit</span>
           </div>
           <div className="preview-row done"><Check size={16} /> Patch hallway wall</div>
           <div className="preview-row">Buy white silicone caulk</div>

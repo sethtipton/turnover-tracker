@@ -138,6 +138,30 @@
   gap: 10px;
 }
 
+.dictation-control {
+  display: grid;
+  gap: 6px;
+  min-width: 156px;
+}
+
+.audio-meter {
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+}
+
+.audio-meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  border-radius: inherit;
+  background: var(--green-2);
+  transition: transform 90ms linear;
+}
+
 .ghost {
   border: 1px solid var(--line);
   background: transparent;
@@ -225,22 +249,32 @@
   margin-bottom: 12px;
 }
 
+.empty-unit-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.empty-unit-panel h2 {
+  font-size: 1.05rem;
+}
+
 .panel-title {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
 }
 
 .panel-title h2 {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  min-width: 0;
   font-size: 1rem;
 }
 
 .panel-toggle {
+  width: 100%;
   min-height: 36px;
   padding: 4px 8px;
   border-radius: 10px;
