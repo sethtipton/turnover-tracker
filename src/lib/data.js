@@ -54,38 +54,59 @@ export async function loadUnits(workspaceId) {
   return data || [];
 }
 
-export async function loadItems(unitId) {
+export async function loadProperties(workspaceId) {
   const { data, error } = await supabase
+    .from("properties")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function loadItems({ propertyId, unitId }) {
+  let query = supabase
     .from("items")
     .select("*, attachments(*)")
-    .eq("unit_id", unitId)
+    .eq("property_id", propertyId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
+  query = unitId ? query.eq("unit_id", unitId) : query.is("unit_id", null);
+  const { data, error } = await query;
+
   if (error) throw error;
   return data || [];
 }
 
-export async function loadActivityLog(unitId) {
-  const { data, error } = await supabase
+export async function loadActivityLog({ propertyId, unitId }) {
+  let query = supabase
     .from("activity_log")
     .select("*")
-    .eq("unit_id", unitId)
+    .eq("property_id", propertyId)
     .order("created_at", { ascending: false })
     .limit(100);
 
+  query = unitId ? query.eq("unit_id", unitId) : query.is("unit_id", null);
+  const { data, error } = await query;
+
   if (error) throw error;
   return data || [];
 }
 
-export function watchUnitData(unitId, callback) {
-  if (!supabase || !unitId) return () => {};
+export function watchScopeData({ propertyId, unitId }, callback) {
+  if (!supabase || !propertyId) return () => {};
+
+  const filter = unitId ? `unit_id=eq.${unitId}` : `property_id=eq.${propertyId}`;
+  const scopeKey = unitId || `property-${propertyId}`;
 
   const channel = supabase
-    .channel(`unit-${unitId}-${crypto.randomUUID()}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "items", filter: `unit_id=eq.${unitId}` }, callback)
-    .on("postgres_changes", { event: "*", schema: "public", table: "attachments", filter: `unit_id=eq.${unitId}` }, callback)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter: `unit_id=eq.${unitId}` }, callback)
+    .channel(`scope-${scopeKey}-${crypto.randomUUID()}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, callback)
+    .on("postgres_changes", { event: "*", schema: "public", table: "attachments", filter }, callback)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter }, callback)
     .subscribe();
 
   return () => {
@@ -133,9 +154,10 @@ export async function deleteItem(id) {
   if (error) throw error;
 }
 
-export async function uploadAttachment({ workspaceId, unitId, itemId, file, kind }) {
+export async function uploadAttachment({ workspaceId, propertyId, unitId, itemId, file, kind }) {
   const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
-  const path = `${workspaceId}/${unitId}/${itemId}/${crypto.randomUUID()}-${safeName}`;
+  const scopePath = unitId || "whole-property";
+  const path = `${workspaceId}/${propertyId}/${scopePath}/${itemId}/${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from("turnover-attachments")
     .upload(path, file, { upsert: false });
@@ -146,7 +168,8 @@ export async function uploadAttachment({ workspaceId, unitId, itemId, file, kind
     .from("attachments")
     .insert({
       workspace_id: workspaceId,
-      unit_id: unitId,
+      property_id: propertyId,
+      unit_id: unitId || null,
       item_id: itemId,
       kind,
       file_name: file.name,

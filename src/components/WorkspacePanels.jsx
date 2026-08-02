@@ -2,21 +2,47 @@ import { Info, Plus } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
-export function UnitSelector({ units, selectedUnitId, onChange }) {
+export function ScopeSelector({
+  properties,
+  units,
+  selectedPropertyId,
+  selectedUnitId,
+  onPropertyChange,
+  onUnitChange,
+}) {
+  const propertyUnits = units.filter((unit) => unit.property_id === selectedPropertyId);
+
   return (
-    <section className="unit-select-bar" aria-labelledby="property-label">
-      <label id="property-label" htmlFor="unit-select">Property</label>
-      <select
-        id="unit-select"
-        name="unit"
-        value={selectedUnitId}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">Select a property</option>
-        {units.map((unit) => (
-          <option key={unit.id} value={unit.id}>{unit.name}</option>
-        ))}
-      </select>
+    <section className="scope-select-bar" aria-label="Property and work scope">
+      <label className="form-field" htmlFor="property-select">
+        <span>Property</span>
+        <select
+          id="property-select"
+          name="property"
+          value={selectedPropertyId}
+          onChange={(event) => onPropertyChange(event.target.value)}
+        >
+          <option value="">Select a property</option>
+          {properties.map((property) => (
+            <option key={property.id} value={property.id}>{property.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className="form-field" htmlFor="scope-select">
+        <span>Scope</span>
+        <select
+          id="scope-select"
+          name="scope"
+          value={selectedUnitId}
+          onChange={(event) => onUnitChange(event.target.value)}
+          disabled={!selectedPropertyId}
+        >
+          <option value="">Whole Property</option>
+          {propertyUnits.map((unit) => (
+            <option key={unit.id} value={unit.id}>{unit.name}</option>
+          ))}
+        </select>
+      </label>
     </section>
   );
 }
@@ -24,7 +50,7 @@ export function UnitSelector({ units, selectedUnitId, onChange }) {
 export function SummaryGrid({ items }) {
   const pendingCount = items.filter((item) => item.status === "pending-review").length;
   return (
-    <section className="summary-grid" aria-label="Unit summary">
+    <section className="summary-grid" aria-label="Selected scope summary">
       <Metric tone="approved" label="Approved" value={items.filter((item) => item.status === "approved").length} />
       <Metric tone="review" label="Pending Review" value={pendingCount} />
       <Metric tone="done" label="Done" value={items.filter((item) => item.status === "done").length} />
@@ -33,11 +59,11 @@ export function SummaryGrid({ items }) {
   );
 }
 
-export function EmptyUnitPanel() {
+export function EmptyScopePanel() {
   return (
-    <section className="panel empty-unit-panel" aria-labelledby="empty-unit-title">
-      <h2 id="empty-unit-title">Select a property</h2>
-      <p>Choose a property above to view its tasks, shopping list, collect/bring items, and recordings.</p>
+    <section className="panel empty-scope-panel" aria-labelledby="empty-scope-title">
+      <h2 id="empty-scope-title">Select a property</h2>
+      <p>Choose a property, then view work for the whole property or one of its units.</p>
     </section>
   );
 }
@@ -140,7 +166,7 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit }) {
   );
 }
 
-export function DictationInbox({ recordings, unitName, onSave, onDelete }) {
+export function DictationInbox({ recordings, scopeName, onSave, onDelete }) {
   if (recordings.length === 0) return null;
 
   return (
@@ -159,7 +185,7 @@ export function DictationInbox({ recordings, unitName, onSave, onDelete }) {
               {typeof recording.peakLevel === "number" ? ` / mic ${Math.round(recording.peakLevel * 100)}%` : ""}
             </p>
             <div className="recording-actions">
-              <button type="button" onClick={() => onSave(recording)}>Save to {unitName}</button>
+              <button type="button" onClick={() => onSave(recording)}>Save to {scopeName}</button>
               <button className="ghost" type="button" onClick={() => onDelete(recording.id)}>Delete recording</button>
             </div>
           </li>

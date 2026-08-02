@@ -8,19 +8,19 @@ import {
   updateItem,
   updateItemsStatus,
   uploadAttachment,
-  watchUnitData,
+  watchScopeData,
 } from "../lib/data";
 import { getAttachmentKind } from "../lib/media";
 import { MATERIAL_LABELS } from "../lib/seed";
 
-export function useUnitItems({ workspaceId, unitId, onMessage }) {
+export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
   const [items, setItems] = useState([]);
   const [activityLog, setActivityLog] = useState([]);
   const [busy, setBusy] = useState(false);
   const requestIdRef = useRef(0);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {
-    if (!unitId) {
+    if (!propertyId) {
       requestIdRef.current += 1;
       setItems([]);
       setActivityLog([]);
@@ -29,11 +29,12 @@ export function useUnitItems({ workspaceId, unitId, onMessage }) {
     }
 
     const requestId = ++requestIdRef.current;
+    const scope = { propertyId, unitId: unitId || null };
     if (!silent) setBusy(true);
     try {
       const [nextItems, nextActivity] = await Promise.all([
-        loadItems(unitId),
-        loadActivityLog(unitId),
+        loadItems(scope),
+        loadActivityLog(scope),
       ]);
       if (requestId !== requestIdRef.current) return;
       setItems(nextItems);
@@ -43,22 +44,26 @@ export function useUnitItems({ workspaceId, unitId, onMessage }) {
     } finally {
       if (!silent && requestId === requestIdRef.current) setBusy(false);
     }
-  }, [onMessage, unitId]);
+  }, [onMessage, propertyId, unitId]);
 
   useEffect(() => {
     refresh();
-    if (!unitId) return undefined;
-    return watchUnitData(unitId, () => refresh({ silent: true }));
-  }, [refresh, unitId]);
+    if (!propertyId) return undefined;
+    return watchScopeData(
+      { propertyId, unitId: unitId || null },
+      () => refresh({ silent: true }),
+    );
+  }, [propertyId, refresh, unitId]);
 
   async function addWork(draft) {
     const title = draft.title.trim();
-    if (!title || !workspaceId || !unitId) return false;
+    if (!title || !workspaceId || !propertyId) return false;
 
     return runMutation(async () => {
       await addItem({
         workspace_id: workspaceId,
-        unit_id: unitId,
+        property_id: propertyId,
+        unit_id: unitId || null,
         title,
         category: draft.kind === "material" ? MATERIAL_LABELS[draft.material_type] : "Task",
         note: draft.note.trim(),
@@ -150,6 +155,7 @@ export function useUnitItems({ workspaceId, unitId, onMessage }) {
       for (const file of files) {
         await uploadAttachment({
           workspaceId,
+          propertyId: item.property_id,
           unitId: item.unit_id,
           itemId: item.id,
           file,

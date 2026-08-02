@@ -1,7 +1,8 @@
 import { ClipboardList, LogOut, Mic } from "lucide-react";
 
 export function AppHeader({
-  selectedUnit,
+  scopeTitle,
+  hasSelectedProperty,
   workMode,
   onToggleWorkMode,
   dictationState,
@@ -16,10 +17,10 @@ export function AppHeader({
     <header className="app-header">
       <div>
         <p className="eyebrow">Turnover Tracker</p>
-        <h1 id="app-title">{selectedUnit?.name || "Turnover Tracker"}</h1>
+        <h1 id="app-title">{scopeTitle || "Turnover Tracker"}</h1>
       </div>
       <div className="header-actions" aria-label="Workspace actions">
-        {!workMode && selectedUnit && (
+        {!workMode && hasSelectedProperty && (
           <div className="dictation-control">
             <button
               className={isRecording ? "recording" : ""}
@@ -45,7 +46,7 @@ export function AppHeader({
             {isRecording && <span className="visually-hidden" id="recording-status">Recording is in progress.</span>}
           </div>
         )}
-        {selectedUnit && (
+        {hasSelectedProperty && (
           <button
             className={workMode ? "work-mode-button active" : "work-mode-button"}
             type="button"

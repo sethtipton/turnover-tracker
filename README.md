@@ -2,6 +2,8 @@
 
 Turnover Tracker is a small rental turnover app built as a public portfolio/demo project with a private family workspace behind Google sign-in.
 
+Work is organized as `workspace -> property -> optional unit`. A property-level scope is available for shared work such as roofs, siding, utilities, and grounds; unit scopes hold work specific to an upstairs, downstairs, or main unit. Existing flat unit records are migrated into this hierarchy without moving their tasks into the property-level scope.
+
 ## Stack
 
 - Vite + React

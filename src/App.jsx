@@ -8,20 +8,21 @@ import { AccessGate, LandingPage } from "./components/LandingPage";
 import { ReviewQueue } from "./components/ReviewQueue";
 import {
   DictationInbox,
-  EmptyUnitPanel,
+  EmptyScopePanel,
   FiltersBar,
   QuickAddPanel,
+  ScopeSelector,
   StatusMessage,
   SummaryGrid,
-  UnitSelector,
 } from "./components/WorkspacePanels";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
-import { useUnitItems } from "./hooks/useUnitItems";
+import { useScopeItems } from "./hooks/useScopeItems";
 import { draftTasksFromDictation } from "./lib/ai";
 import {
   addItem,
   getAttachmentUrl,
   getSession,
+  loadProperties,
   loadUnits,
   loadWorkspace,
   signInWithGoogle,
@@ -29,7 +30,7 @@ import {
   uploadAttachment,
   watchAuth,
 } from "./lib/data";
-import { getUnitIdFromCurrentPath, updateUnitPath } from "./lib/routing";
+import { getScopeFromCurrentPath, updateScopePath } from "./lib/routing";
 import { isSupabaseConfigured } from "./lib/supabase";
 
 const emptyDraft = {
@@ -42,7 +43,9 @@ const emptyDraft = {
 function App() {
   const [session, setSession] = useState(null);
   const [workspace, setWorkspace] = useState(null);
+  const [properties, setProperties] = useState([]);
   const [units, setUnits] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
   const [query, setQuery] = useState("");
@@ -60,13 +63,17 @@ function App() {
     start: startDictation,
     stop: stopDictation,
     removeRecording,
-  } = useAudioRecorder({ unitId: selectedUnitId, onMessage: setMessage });
+  } = useAudioRecorder({
+    propertyId: selectedPropertyId,
+    unitId: selectedUnitId,
+    onMessage: setMessage,
+  });
 
   const {
     items,
     activityLog,
     busy: itemsBusy,
-    refresh: refreshUnitData,
+    refresh: refreshScopeData,
     addWork,
     changeStatus,
     approveAll,
@@ -74,16 +81,24 @@ function App() {
     removeItem,
     uploadFiles,
     removeAttachment,
-  } = useUnitItems({
+  } = useScopeItems({
     workspaceId: workspace?.id,
+    propertyId: selectedPropertyId,
     unitId: selectedUnitId,
     onMessage: setMessage,
   });
 
   const busy = itemsBusy || dictationBusy;
   const userEmail = session?.user?.email?.toLowerCase();
+  const selectedProperty = properties.find((property) => property.id === selectedPropertyId) || null;
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
-  const selectedUnitRecordings = recordings.filter((recording) => recording.unitId === selectedUnitId);
+  const selectedScopeTitle = selectedProperty
+    ? `${selectedProperty.name} / ${selectedUnit?.name || "Whole Property"}`
+    : "";
+  const selectedScopeRecordings = recordings.filter((recording) => (
+    recording.propertyId === selectedPropertyId
+    && (recording.unitId || "") === selectedUnitId
+  ));
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -98,10 +113,24 @@ function App() {
       setAccessError("");
       try {
         const workspaceData = await loadWorkspace();
-        const unitData = await loadUnits(workspaceData.id);
+        const [propertyData, unitData] = await Promise.all([
+          loadProperties(workspaceData.id),
+          loadUnits(workspaceData.id),
+        ]);
+        const routeScope = getScopeFromCurrentPath(propertyData, unitData);
         setWorkspace(workspaceData);
+        setProperties(propertyData);
         setUnits(unitData);
-        setSelectedUnitId(getUnitIdFromCurrentPath(unitData));
+        setSelectedPropertyId(routeScope.propertyId);
+        setSelectedUnitId(routeScope.unitId);
+
+        if (routeScope.propertyId) {
+          updateScopePath(
+            propertyData.find((property) => property.id === routeScope.propertyId),
+            unitData.find((unit) => unit.id === routeScope.unitId),
+            { replace: true },
+          );
+        }
       } catch (error) {
         setAccessError(error.message);
       }
@@ -112,21 +141,23 @@ function App() {
 
   useEffect(() => {
     function handlePopState() {
-      setSelectedUnitId(getUnitIdFromCurrentPath(units));
+      const routeScope = getScopeFromCurrentPath(properties, units);
+      setSelectedPropertyId(routeScope.propertyId);
+      setSelectedUnitId(routeScope.unitId);
     }
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [units]);
+  }, [properties, units]);
 
   useEffect(() => {
-    document.title = selectedUnit ? `${selectedUnit.name} | Turnover Tracker` : "Turnover Tracker";
-  }, [selectedUnit]);
+    document.title = selectedScopeTitle ? `${selectedScopeTitle} | Turnover Tracker` : "Turnover Tracker";
+  }, [selectedScopeTitle]);
 
   useEffect(() => {
     setMediaUrls({});
-    if (!selectedUnitId) setWorkMode(false);
-  }, [selectedUnitId]);
+    if (!selectedPropertyId) setWorkMode(false);
+  }, [selectedPropertyId, selectedUnitId]);
 
   useEffect(() => {
     const attachments = items.flatMap((item) => item.attachments || []);
@@ -171,9 +202,19 @@ function App() {
   const collectItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "collect");
   const recordingItems = activeItems.filter((item) => item.kind === "dictation");
 
+  function handlePropertyChange(propertyId) {
+    const property = properties.find((candidate) => candidate.id === propertyId) || null;
+    setSelectedPropertyId(propertyId);
+    setSelectedUnitId("");
+    updateScopePath(property, null);
+  }
+
   function handleUnitChange(unitId) {
+    const unit = units.find((candidate) => (
+      candidate.id === unitId && candidate.property_id === selectedPropertyId
+    )) || null;
     setSelectedUnitId(unitId);
-    updateUnitPath(units.find((unit) => unit.id === unitId));
+    updateScopePath(selectedProperty, unit);
   }
 
   async function handleAddItem(event) {
@@ -198,9 +239,12 @@ function App() {
 
   async function saveRecording(recording) {
     if (!workspace) return;
-    const recordingUnit = units.find((unit) => unit.id === recording.unitId);
-    if (!recordingUnit) {
-      setMessage("The property for this recording is no longer available.");
+    const recordingProperty = properties.find((property) => property.id === recording.propertyId);
+    const recordingUnit = recording.unitId
+      ? units.find((unit) => unit.id === recording.unitId && unit.property_id === recording.propertyId)
+      : null;
+    if (!recordingProperty || (recording.unitId && !recordingUnit)) {
+      setMessage("The property scope for this recording is no longer available.");
       return;
     }
 
@@ -208,7 +252,8 @@ function App() {
     try {
       const dictationItem = await addItem({
         workspace_id: workspace.id,
-        unit_id: recording.unitId,
+        property_id: recording.propertyId,
+        unit_id: recording.unitId || null,
         title: "Dictated property update",
         category: "Dictation",
         note: "Raw recording saved. AI extraction queued.",
@@ -218,6 +263,7 @@ function App() {
       });
       const attachment = await uploadAttachment({
         workspaceId: workspace.id,
+        propertyId: recording.propertyId,
         unitId: recording.unitId,
         itemId: dictationItem.id,
         file: recording.file,
@@ -226,6 +272,7 @@ function App() {
       try {
         setMessage("Recording saved. Drafting pending tasks...");
         const draftResult = await draftTasksFromDictation({
+          propertyId: recording.propertyId,
           unitId: recording.unitId,
           dictationItemId: dictationItem.id,
           attachmentId: attachment.id,
@@ -238,7 +285,12 @@ function App() {
         setMessage(`Recording saved, but AI drafting could not run: ${aiError.message}`);
       }
       removeRecording(recording.id);
-      if (recording.unitId === selectedUnitId) await refreshUnitData({ silent: true });
+      if (
+        recording.propertyId === selectedPropertyId
+        && (recording.unitId || "") === selectedUnitId
+      ) {
+        await refreshScopeData({ silent: true });
+      }
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -256,7 +308,8 @@ function App() {
       <main className={`app-shell ${workMode ? "work-mode" : ""}`} id="main-content" tabIndex="-1">
         <div className="workspace-top">
           <AppHeader
-            selectedUnit={selectedUnit}
+            scopeTitle={selectedScopeTitle}
+            hasSelectedProperty={Boolean(selectedProperty)}
             workMode={workMode}
             onToggleWorkMode={() => setWorkMode((current) => !current)}
             dictationState={dictationState}
@@ -266,13 +319,20 @@ function App() {
             onSignOut={signOut}
           />
           {!workMode && (
-            <UnitSelector units={units} selectedUnitId={selectedUnitId} onChange={handleUnitChange} />
+            <ScopeSelector
+              properties={properties}
+              units={units}
+              selectedPropertyId={selectedPropertyId}
+              selectedUnitId={selectedUnitId}
+              onPropertyChange={handlePropertyChange}
+              onUnitChange={handleUnitChange}
+            />
           )}
         </div>
 
-        {selectedUnit ? <SummaryGrid items={items} /> : <EmptyUnitPanel />}
+        {selectedProperty ? <SummaryGrid items={items} /> : <EmptyScopePanel />}
 
-        {!workMode && selectedUnit && (
+        {!workMode && selectedProperty && (
           <>
             <ReviewQueue
               items={reviewItems}
@@ -291,8 +351,8 @@ function App() {
               onStatusChange={setStatusFilter}
             />
             <DictationInbox
-              recordings={selectedUnitRecordings}
-              unitName={selectedUnit.name}
+              recordings={selectedScopeRecordings}
+              scopeName={selectedScopeTitle}
               onSave={saveRecording}
               onDelete={removeRecording}
             />
@@ -306,7 +366,7 @@ function App() {
           </>
         )}
 
-        {selectedUnit && (
+        {selectedProperty && (
           <div className="work-grid">
             {!workMode && (
               <div className="materials-row">

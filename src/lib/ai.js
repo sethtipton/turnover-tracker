@@ -1,10 +1,10 @@
 import { supabase } from "./supabase";
 
-export async function draftTasksFromDictation({ unitId, dictationItemId, attachmentId }) {
+export async function draftTasksFromDictation({ propertyId, unitId, dictationItemId, attachmentId }) {
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("draft-tasks", {
-    body: { unitId, dictationItemId, attachmentId },
+    body: { propertyId, unitId: unitId || null, dictationItemId, attachmentId },
   });
 
   if (error) {

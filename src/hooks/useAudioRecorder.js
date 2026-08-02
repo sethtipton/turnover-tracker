@@ -7,7 +7,7 @@ const AUDIO_MIME_TYPES = [
   "audio/aac",
 ];
 
-export function useAudioRecorder({ unitId, onMessage }) {
+export function useAudioRecorder({ propertyId, unitId, onMessage }) {
   const [state, setState] = useState("idle");
   const [level, setLevel] = useState(0);
   const [recordings, setRecordings] = useState([]);
@@ -28,7 +28,7 @@ export function useAudioRecorder({ unitId, onMessage }) {
   }, []);
 
   async function start() {
-    if (!unitId) {
+    if (!propertyId) {
       onMessage("Select a property before recording.");
       return;
     }
@@ -83,7 +83,8 @@ export function useAudioRecorder({ unitId, onMessage }) {
           id: crypto.randomUUID(),
           file,
           url,
-          unitId,
+          propertyId,
+          unitId: unitId || null,
           durationMs,
           size: blob.size,
           mimeType: blob.type,

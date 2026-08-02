@@ -15,20 +15,34 @@ create table if not exists public.workspace_members (
   unique (workspace_id, email)
 );
 
-create table if not exists public.units (
+create table if not exists public.properties (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   name text not null,
   status text not null default 'active',
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, name)
+);
+
+create table if not exists public.units (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  name text not null,
+  status text not null default 'active',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (property_id, name)
 );
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  unit_id uuid not null references public.units(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  unit_id uuid references public.units(id) on delete set null,
   title text not null,
   note text not null default '',
   category text not null default 'Prep',
@@ -44,7 +58,8 @@ create table if not exists public.items (
 create table if not exists public.attachments (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  unit_id uuid not null references public.units(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  unit_id uuid references public.units(id) on delete set null,
   item_id uuid not null references public.items(id) on delete cascade,
   kind text not null default 'file' check (kind in ('file', 'photo', 'audio')),
   file_name text not null,
@@ -57,7 +72,8 @@ create table if not exists public.attachments (
 create table if not exists public.activity_log (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  unit_id uuid not null references public.units(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  unit_id uuid references public.units(id) on delete set null,
   item_id uuid references public.items(id) on delete set null,
   action text not null,
   label text not null,
@@ -66,11 +82,24 @@ create table if not exists public.activity_log (
   created_at timestamptz not null default now()
 );
 
-create index if not exists activity_log_unit_created_idx
-on public.activity_log (unit_id, created_at desc);
+create index if not exists properties_workspace_order_idx
+on public.properties (workspace_id, sort_order, name);
+
+create index if not exists units_property_order_idx
+on public.units (property_id, sort_order, name);
+
+create index if not exists items_property_scope_order_idx
+on public.items (property_id, unit_id, sort_order, created_at);
+
+create index if not exists attachments_property_scope_idx
+on public.attachments (property_id, unit_id, created_at);
+
+create index if not exists activity_log_property_scope_created_idx
+on public.activity_log (property_id, unit_id, created_at desc);
 
 alter table public.workspaces enable row level security;
 alter table public.workspace_members enable row level security;
+alter table public.properties enable row level security;
 alter table public.units enable row level security;
 alter table public.items enable row level security;
 alter table public.attachments enable row level security;
@@ -144,6 +173,7 @@ declare
   activity_action text;
   activity_item_id uuid;
   activity_workspace_id uuid;
+  activity_property_id uuid;
   activity_unit_id uuid;
   activity_label text;
 begin
@@ -152,7 +182,9 @@ begin
     and new.note is not distinct from old.note
     and new.status is not distinct from old.status
     and new.material_type is not distinct from old.material_type
-    and new.sort_order is not distinct from old.sort_order then
+    and new.sort_order is not distinct from old.sort_order
+    and new.property_id is not distinct from old.property_id
+    and new.unit_id is not distinct from old.unit_id then
     return new;
   end if;
 
@@ -160,12 +192,14 @@ begin
     activity_action := 'created';
     activity_item_id := new.id;
     activity_workspace_id := new.workspace_id;
+    activity_property_id := new.property_id;
     activity_unit_id := new.unit_id;
     activity_label := new.title;
   elsif tg_op = 'DELETE' then
     activity_action := 'deleted';
     activity_item_id := old.id;
     activity_workspace_id := old.workspace_id;
+    activity_property_id := old.property_id;
     activity_unit_id := old.unit_id;
     activity_label := old.title;
   else
@@ -177,14 +211,16 @@ begin
     end;
     activity_item_id := new.id;
     activity_workspace_id := new.workspace_id;
+    activity_property_id := new.property_id;
     activity_unit_id := new.unit_id;
     activity_label := new.title;
   end if;
 
   insert into public.activity_log (
-    workspace_id, unit_id, item_id, action, label, actor_email, details
+    workspace_id, property_id, unit_id, item_id, action, label, actor_email, details
   ) values (
     activity_workspace_id,
+    activity_property_id,
     activity_unit_id,
     activity_item_id,
     activity_action,
@@ -221,9 +257,10 @@ begin
   where item.id = attachment_record.item_id;
 
   insert into public.activity_log (
-    workspace_id, unit_id, item_id, action, label, actor_email, details
+    workspace_id, property_id, unit_id, item_id, action, label, actor_email, details
   ) values (
     attachment_record.workspace_id,
+    attachment_record.property_id,
     attachment_record.unit_id,
     attachment_record.item_id,
     case when tg_op = 'DELETE' then 'attachment-removed' else 'attachment-added' end,
@@ -270,6 +307,15 @@ create policy "Editors can update workspaces"
 on public.workspaces for update to authenticated
 using (public.can_edit_workspace(id))
 with check (public.can_edit_workspace(id));
+
+create policy "Members can read properties"
+on public.properties for select to authenticated
+using (public.is_workspace_member(workspace_id));
+
+create policy "Editors can manage properties"
+on public.properties for all to authenticated
+using (public.can_edit_workspace(workspace_id))
+with check (public.can_edit_workspace(workspace_id));
 
 create policy "Members can read units"
 on public.units for select to authenticated
@@ -348,6 +394,20 @@ do $$
 begin
   if not exists (
     select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'properties'
+  ) then
+    alter publication supabase_realtime add table public.properties;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'units'
+  ) then
+    alter publication supabase_realtime add table public.units;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'items'
   ) then
     alter publication supabase_realtime add table public.items;
@@ -369,27 +429,42 @@ begin
 end;
 $$;
 
-with workspace as (
-  insert into public.workspaces (name)
-  values ('Tipton Rentals')
-  on conflict (name) do update set name = excluded.name
-  returning id
-)
-insert into public.units (workspace_id, name, sort_order)
-select workspace.id, unit_name, sort_order
-from workspace,
-(values
-  ('451 Upstairs', 1),
-  ('451 Downstairs', 2),
-  ('441 Upstairs', 3),
-  ('441 Downstairs', 4),
-  ('1065 Hudson Rd', 5),
-  ('1067 Hudson Rd', 6),
-  ('4 Vine Ct', 7),
-  ('126 N Mantua', 8),
-  ('124 N Mantua', 9)
-) as seed_units(unit_name, sort_order)
-on conflict do nothing;
+insert into public.workspaces (name)
+values ('Tipton Rentals')
+on conflict (name) do update set name = excluded.name;
+
+insert into public.properties (workspace_id, name, sort_order)
+select workspace.id, seed.name, seed.sort_order
+from public.workspaces workspace
+cross join (values
+  ('451', 1),
+  ('441', 2),
+  ('1065 Hudson Rd', 3),
+  ('1067 Hudson Rd', 4),
+  ('4 Vine Ct', 5),
+  ('126 N Mantua', 6),
+  ('124 N Mantua', 7)
+) as seed(name, sort_order)
+where workspace.name = 'Tipton Rentals'
+on conflict (workspace_id, name) do update set sort_order = excluded.sort_order;
+
+insert into public.units (workspace_id, property_id, name, sort_order)
+select workspace.id, property.id, seed.unit_name, seed.sort_order
+from public.workspaces workspace
+join public.properties property on property.workspace_id = workspace.id
+join (values
+  ('451', 'Upstairs', 1),
+  ('451', 'Downstairs', 2),
+  ('441', 'Upstairs', 1),
+  ('441', 'Downstairs', 2),
+  ('1065 Hudson Rd', 'Main Unit', 1),
+  ('1067 Hudson Rd', 'Main Unit', 1),
+  ('4 Vine Ct', 'Main Unit', 1),
+  ('126 N Mantua', 'Main Unit', 1),
+  ('124 N Mantua', 'Main Unit', 1)
+) as seed(property_name, unit_name, sort_order) on seed.property_name = property.name
+where workspace.name = 'Tipton Rentals'
+on conflict (property_id, name) do update set sort_order = excluded.sort_order;
 
 insert into public.workspace_members (workspace_id, email, role)
 select workspace.id, member.email, member.role

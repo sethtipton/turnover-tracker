@@ -1,15 +1,13 @@
 export const WORKSPACE_NAME = "Tipton Rentals";
 
-export const INITIAL_UNITS = [
-  "451 Upstairs",
-  "451 Downstairs",
-  "441 Upstairs",
-  "441 Downstairs",
-  "1065 Hudson Rd",
-  "1067 Hudson Rd",
-  "4 Vine Ct",
-  "126 N Mantua",
-  "124 N Mantua",
+export const INITIAL_PROPERTIES = [
+  { name: "451", units: ["Upstairs", "Downstairs"] },
+  { name: "441", units: ["Upstairs", "Downstairs"] },
+  { name: "1065 Hudson Rd", units: ["Main Unit"] },
+  { name: "1067 Hudson Rd", units: ["Main Unit"] },
+  { name: "4 Vine Ct", units: ["Main Unit"] },
+  { name: "126 N Mantua", units: ["Main Unit"] },
+  { name: "124 N Mantua", units: ["Main Unit"] },
 ];
 
 export const DEFAULT_CATEGORIES = [

@@ -69,27 +69,44 @@ export default {
         return jsonResponse({ error: "Authentication required." }, 401);
       }
 
-      const { unitId, dictationItemId, attachmentId } = await request.json();
-      if (!unitId || !dictationItemId || !attachmentId) {
-        return jsonResponse({ error: "unitId, dictationItemId, and attachmentId are required." }, 400);
+      const { propertyId, unitId, dictationItemId, attachmentId } = await request.json();
+      if (!propertyId || !dictationItemId || !attachmentId) {
+        return jsonResponse({ error: "propertyId, dictationItemId, and attachmentId are required." }, 400);
       }
 
-      const { data: unit, error: unitError } = await supabase
-        .from("units")
+      const { data: property, error: propertyError } = await supabase
+        .from("properties")
         .select("id, workspace_id, name")
-        .eq("id", unitId)
+        .eq("id", propertyId)
         .single();
-      if (unitError || !unit) {
+      if (propertyError || !property) {
         return jsonResponse({ error: "You do not have access to this property." }, 403);
       }
 
-      const { data: attachment, error: attachmentError } = await supabase
+      let unit: { id: string; name: string } | null = null;
+      if (unitId) {
+        const { data, error } = await supabase
+          .from("units")
+          .select("id, name")
+          .eq("id", unitId)
+          .eq("property_id", propertyId)
+          .single();
+        if (error || !data) {
+          return jsonResponse({ error: "The selected unit does not belong to this property." }, 400);
+        }
+        unit = data;
+      }
+
+      let attachmentQuery = supabase
         .from("attachments")
-        .select("id, item_id, unit_id, kind, file_name, mime_type, storage_path")
+        .select("id, item_id, property_id, unit_id, kind, file_name, mime_type, storage_path")
         .eq("id", attachmentId)
-        .eq("unit_id", unitId)
+        .eq("property_id", propertyId)
         .eq("item_id", dictationItemId)
-        .single();
+      attachmentQuery = unitId
+        ? attachmentQuery.eq("unit_id", unitId)
+        : attachmentQuery.is("unit_id", null);
+      const { data: attachment, error: attachmentError } = await attachmentQuery.single();
       if (attachmentError) throw attachmentError;
       if (attachment.kind !== "audio") {
         return jsonResponse({ error: "The selected attachment is not an audio recording." }, 400);
@@ -109,22 +126,27 @@ export default {
       const draftedItems = ensureDraftItems(await draftItems({
         apiKey: openAiApiKey,
         model: openAiModel,
-        unitName: unit.name,
+        propertyName: property.name,
+        unitName: unit?.name || null,
         transcript,
       }), transcript);
 
-      const { data: currentLastItem } = await supabase
+      let lastItemQuery = supabase
         .from("items")
         .select("sort_order")
-        .eq("unit_id", unitId)
+        .eq("property_id", propertyId)
         .order("sort_order", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      lastItemQuery = unitId
+        ? lastItemQuery.eq("unit_id", unitId)
+        : lastItemQuery.is("unit_id", null);
+      const { data: currentLastItem } = await lastItemQuery.maybeSingle();
       const nextSortOrder = (currentLastItem?.sort_order || 0) + 1;
 
       const rows = draftedItems.map((item, index) => ({
-        workspace_id: unit.workspace_id,
-        unit_id: unitId,
+        workspace_id: property.workspace_id,
+        property_id: propertyId,
+        unit_id: unitId || null,
         title: item.title,
         note: item.note || "",
         category: getDraftCategory(item),
@@ -149,7 +171,8 @@ export default {
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", dictationItemId);
+        .eq("id", dictationItemId)
+        .eq("property_id", propertyId);
 
       return jsonResponse({
         transcript,
@@ -191,10 +214,11 @@ async function transcribeAudio({ apiKey, model, fileName, audioBlob }: {
   return transcript;
 }
 
-async function draftItems({ apiKey, model, unitName, transcript }: {
+async function draftItems({ apiKey, model, propertyName, unitName, transcript }: {
   apiKey: string;
   model: string;
-  unitName: string;
+  propertyName: string;
+  unitName: string | null;
   transcript: string;
 }) {
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -213,7 +237,7 @@ async function draftItems({ apiKey, model, unitName, transcript }: {
         },
         {
           role: "user",
-          content: `Unit: ${unitName}\n\nTranscript:\n${transcript}`,
+          content: `Property: ${propertyName}\nScope: ${unitName || "Whole Property"}\n\nTranscript:\n${transcript}`,
         },
       ],
       text: {
