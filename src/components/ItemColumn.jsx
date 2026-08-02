@@ -71,7 +71,7 @@ export function ItemColumn({
                   >
                     {item.status === "done" && <Check size={15} aria-hidden="true" />}
                   </button>
-                  <EditableItem item={item} onSave={handleItemChange} compact={compact} />
+                  <EditableItem item={item} onSave={handleItemChange} />
                 </div>
                 {!compact && (
                   <ItemActions
@@ -137,7 +137,7 @@ function ItemActions({ item, onStatus, onDelete, onUpload }) {
   );
 }
 
-export function EditableItem({ item, onSave, compact = false, showEditLabel = false }) {
+export function EditableItem({ item, onSave, showEditLabel = false }) {
   const [draft, setDraft] = useState(() => getItemEditDraft(item));
   const [isEditing, setIsEditing] = useState(false);
 
@@ -183,7 +183,7 @@ export function EditableItem({ item, onSave, compact = false, showEditLabel = fa
             Done
           </span>
         )}
-        {!compact && item.note && <p>{item.note}</p>}
+        {item.note && <p>{item.note}</p>}
       </div>
     );
   }

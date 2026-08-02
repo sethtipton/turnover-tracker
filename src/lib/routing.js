@@ -1,3 +1,5 @@
+import { UNIT_ROUTE_ALIASES } from "./seed";
+
 const basePath = normalizeBasePath(import.meta.env.BASE_URL);
 
 export function normalizeBasePath(path) {
@@ -25,7 +27,7 @@ export function getScopeFromCurrentPath(properties, units) {
     const unit = routeParts[1]
       ? units.find((candidate) => (
         candidate.property_id === property.id
-        && getSlug(candidate.name).toLowerCase() === routeParts[1]
+        && getUnitRouteSlugs(candidate.name).includes(routeParts[1])
       ))
       : null;
     return { propertyId: property.id, unitId: unit?.id || "" };
@@ -33,12 +35,22 @@ export function getScopeFromCurrentPath(properties, units) {
 
   const legacyUnit = units.find((candidate) => {
     const parent = properties.find((candidateProperty) => candidateProperty.id === candidate.property_id);
-    return parent && getSlug(`${parent.name} ${candidate.name}`).toLowerCase() === routeParts[0];
+    return parent && getUnitRouteNames(candidate.name).some((unitName) => (
+      getSlug(`${parent.name} ${unitName}`).toLowerCase() === routeParts[0]
+    ));
   });
 
   return legacyUnit
     ? { propertyId: legacyUnit.property_id, unitId: legacyUnit.id }
     : { propertyId: "", unitId: "" };
+}
+
+function getUnitRouteNames(unitName) {
+  return [unitName, ...(UNIT_ROUTE_ALIASES[unitName] || [])];
+}
+
+function getUnitRouteSlugs(unitName) {
+  return getUnitRouteNames(unitName).map((name) => getSlug(name).toLowerCase());
 }
 
 export function updateScopePath(property, unit, { replace = false } = {}) {

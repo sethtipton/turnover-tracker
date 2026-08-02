@@ -1,6 +1,6 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { INITIAL_PROPERTIES } from "../src/lib/seed.js";
+import { INITIAL_PROPERTIES, UNIT_ROUTE_ALIASES } from "../src/lib/seed.js";
 
 const distDir = "dist";
 const source = join(distDir, "index.html");
@@ -13,8 +13,11 @@ for (const property of INITIAL_PROPERTIES) {
   await createFallback(propertySlug);
 
   for (const unit of property.units) {
-    await createFallback(join(propertySlug, getSlug(unit)));
-    await createFallback(getSlug(`${property.name} ${unit}`));
+    const routeNames = [unit, ...(UNIT_ROUTE_ALIASES[unit] || [])];
+    for (const routeName of routeNames) {
+      await createFallback(join(propertySlug, getSlug(routeName)));
+      await createFallback(getSlug(`${property.name} ${routeName}`));
+    }
   }
 }
 
