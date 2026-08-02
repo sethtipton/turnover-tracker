@@ -12,7 +12,6 @@
   }
 
   .app-shell {
-    container: app / inline-size;
     padding-block: 1rem 2.5rem;
   }
 
@@ -712,7 +711,8 @@
     }
   }
 
-  @container app (width < 52rem) {
+  /* Page-level mobile layout uses the viewport to avoid delayed iOS container-query recalculation. */
+  @media (max-width: 52rem) {
     .workspace-top {
       position: sticky;
       z-index: 20;
