@@ -1,25 +1,18 @@
 create extension if not exists pgcrypto;
 
-create or replace function public.is_turnover_allowed()
-returns boolean
-language sql
-stable
-as $$
-  select lower(coalesce(auth.jwt() ->> 'email', '')) = any (array[
-    'jillianrtipton@gmail.com',
-    'morgantipton@gmail.com',
-    'ben.tipton@gmail.com',
-    'bgatipton@gmail.com',
-    'ryantipton@gmail.com',
-    'sethtipton@gmail.com',
-    'threeoakllc@gmail.com'
-  ]);
-$$;
-
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.workspace_members (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  email text not null,
+  role text not null default 'editor' check (role in ('owner', 'editor', 'viewer')),
+  created_at timestamptz not null default now(),
+  unique (workspace_id, email)
 );
 
 create table if not exists public.units (
@@ -68,59 +61,260 @@ create table if not exists public.activity_log (
   item_id uuid references public.items(id) on delete set null,
   action text not null,
   label text not null,
+  actor_email text,
+  details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
+create index if not exists activity_log_unit_created_idx
+on public.activity_log (unit_id, created_at desc);
+
 alter table public.workspaces enable row level security;
+alter table public.workspace_members enable row level security;
 alter table public.units enable row level security;
 alter table public.items enable row level security;
 alter table public.attachments enable row level security;
 alter table public.activity_log enable row level security;
 
-create policy "Allowed family can read workspaces"
+create or replace function public.is_workspace_member(target_workspace_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.workspace_members member
+    where member.workspace_id = target_workspace_id
+      and lower(member.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+$$;
+
+create or replace function public.can_edit_workspace(target_workspace_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.workspace_members member
+    where member.workspace_id = target_workspace_id
+      and lower(member.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      and member.role in ('owner', 'editor')
+  );
+$$;
+
+create or replace function public.is_workspace_owner(target_workspace_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.workspace_members member
+    where member.workspace_id = target_workspace_id
+      and lower(member.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      and member.role = 'owner'
+  );
+$$;
+
+create or replace function public.can_access_turnover_object(object_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.workspace_members member
+    where member.workspace_id::text = split_part(object_name, '/', 1)
+      and lower(member.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+$$;
+
+create or replace function public.log_item_activity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  activity_action text;
+  activity_item_id uuid;
+  activity_workspace_id uuid;
+  activity_unit_id uuid;
+  activity_label text;
+begin
+  if tg_op = 'UPDATE'
+    and new.title is not distinct from old.title
+    and new.note is not distinct from old.note
+    and new.status is not distinct from old.status
+    and new.material_type is not distinct from old.material_type
+    and new.sort_order is not distinct from old.sort_order then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    activity_action := 'created';
+    activity_item_id := new.id;
+    activity_workspace_id := new.workspace_id;
+    activity_unit_id := new.unit_id;
+    activity_label := new.title;
+  elsif tg_op = 'DELETE' then
+    activity_action := 'deleted';
+    activity_item_id := old.id;
+    activity_workspace_id := old.workspace_id;
+    activity_unit_id := old.unit_id;
+    activity_label := old.title;
+  else
+    activity_action := case
+      when new.status = 'done' and old.status <> 'done' then 'completed'
+      when old.status = 'done' and new.status <> 'done' then 'reopened'
+      when new.status <> old.status then 'status-changed'
+      else 'updated'
+    end;
+    activity_item_id := new.id;
+    activity_workspace_id := new.workspace_id;
+    activity_unit_id := new.unit_id;
+    activity_label := new.title;
+  end if;
+
+  insert into public.activity_log (
+    workspace_id, unit_id, item_id, action, label, actor_email, details
+  ) values (
+    activity_workspace_id,
+    activity_unit_id,
+    activity_item_id,
+    activity_action,
+    activity_label,
+    lower(nullif(auth.jwt() ->> 'email', '')),
+    jsonb_build_object('source', 'item-trigger')
+  );
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.log_attachment_activity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  attachment_record public.attachments;
+  item_label text;
+begin
+  if tg_op = 'DELETE' then
+    attachment_record := old;
+  else
+    attachment_record := new;
+  end if;
+
+  select item.title into item_label
+  from public.items item
+  where item.id = attachment_record.item_id;
+
+  insert into public.activity_log (
+    workspace_id, unit_id, item_id, action, label, actor_email, details
+  ) values (
+    attachment_record.workspace_id,
+    attachment_record.unit_id,
+    attachment_record.item_id,
+    case when tg_op = 'DELETE' then 'attachment-removed' else 'attachment-added' end,
+    coalesce(item_label, attachment_record.file_name),
+    lower(nullif(auth.jwt() ->> 'email', '')),
+    jsonb_build_object(
+      'source', 'attachment-trigger',
+      'file_name', attachment_record.file_name,
+      'kind', attachment_record.kind
+    )
+  );
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists items_activity_log_trigger on public.items;
+create trigger items_activity_log_trigger
+after insert or update or delete on public.items
+for each row execute function public.log_item_activity();
+
+drop trigger if exists attachments_activity_log_trigger on public.attachments;
+create trigger attachments_activity_log_trigger
+after insert or delete on public.attachments
+for each row execute function public.log_attachment_activity();
+
+revoke all on function public.is_workspace_member(uuid) from public;
+revoke all on function public.can_edit_workspace(uuid) from public;
+revoke all on function public.is_workspace_owner(uuid) from public;
+revoke all on function public.can_access_turnover_object(text) from public;
+grant execute on function public.is_workspace_member(uuid) to authenticated;
+grant execute on function public.can_edit_workspace(uuid) to authenticated;
+grant execute on function public.is_workspace_owner(uuid) to authenticated;
+grant execute on function public.can_access_turnover_object(text) to authenticated;
+
+create policy "Members can read workspaces"
 on public.workspaces for select to authenticated
-using (public.is_turnover_allowed());
+using (public.is_workspace_member(id));
 
-create policy "Allowed family can edit workspaces"
-on public.workspaces for all to authenticated
-using (public.is_turnover_allowed())
-with check (public.is_turnover_allowed());
+create policy "Editors can update workspaces"
+on public.workspaces for update to authenticated
+using (public.can_edit_workspace(id))
+with check (public.can_edit_workspace(id));
 
-create policy "Allowed family can read units"
+create policy "Members can read units"
 on public.units for select to authenticated
-using (public.is_turnover_allowed());
+using (public.is_workspace_member(workspace_id));
 
-create policy "Allowed family can edit units"
+create policy "Editors can manage units"
 on public.units for all to authenticated
-using (public.is_turnover_allowed())
-with check (public.is_turnover_allowed());
+using (public.can_edit_workspace(workspace_id))
+with check (public.can_edit_workspace(workspace_id));
 
-create policy "Allowed family can read items"
+create policy "Members can read items"
 on public.items for select to authenticated
-using (public.is_turnover_allowed());
+using (public.is_workspace_member(workspace_id));
 
-create policy "Allowed family can edit items"
+create policy "Editors can manage items"
 on public.items for all to authenticated
-using (public.is_turnover_allowed())
-with check (public.is_turnover_allowed());
+using (public.can_edit_workspace(workspace_id))
+with check (public.can_edit_workspace(workspace_id));
 
-create policy "Allowed family can read attachments"
+create policy "Members can read attachments"
 on public.attachments for select to authenticated
-using (public.is_turnover_allowed());
+using (public.is_workspace_member(workspace_id));
 
-create policy "Allowed family can edit attachments"
+create policy "Editors can manage attachments"
 on public.attachments for all to authenticated
-using (public.is_turnover_allowed())
-with check (public.is_turnover_allowed());
+using (public.can_edit_workspace(workspace_id))
+with check (public.can_edit_workspace(workspace_id));
 
-create policy "Allowed family can read activity"
+create policy "Members can read activity"
 on public.activity_log for select to authenticated
-using (public.is_turnover_allowed());
+using (public.is_workspace_member(workspace_id));
 
-create policy "Allowed family can edit activity"
+create policy "Editors can manage activity"
 on public.activity_log for all to authenticated
-using (public.is_turnover_allowed())
-with check (public.is_turnover_allowed());
+using (public.can_edit_workspace(workspace_id))
+with check (public.can_edit_workspace(workspace_id));
+
+create policy "Members can read memberships"
+on public.workspace_members for select to authenticated
+using (public.is_workspace_member(workspace_id));
+
+create policy "Owners can manage memberships"
+on public.workspace_members for all to authenticated
+using (public.is_workspace_owner(workspace_id))
+with check (public.is_workspace_owner(workspace_id));
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -132,17 +326,48 @@ values (
 )
 on conflict (id) do nothing;
 
-create policy "Allowed family can read storage"
+create policy "Members can read storage"
 on storage.objects for select to authenticated
-using (bucket_id = 'turnover-attachments' and public.is_turnover_allowed());
+using (bucket_id = 'turnover-attachments' and public.can_access_turnover_object(name));
 
-create policy "Allowed family can upload storage"
+create policy "Editors can upload storage"
 on storage.objects for insert to authenticated
-with check (bucket_id = 'turnover-attachments' and public.is_turnover_allowed());
+with check (
+  bucket_id = 'turnover-attachments'
+  and public.can_edit_workspace((split_part(name, '/', 1))::uuid)
+);
 
-create policy "Allowed family can delete storage"
+create policy "Editors can delete storage"
 on storage.objects for delete to authenticated
-using (bucket_id = 'turnover-attachments' and public.is_turnover_allowed());
+using (
+  bucket_id = 'turnover-attachments'
+  and public.can_edit_workspace((split_part(name, '/', 1))::uuid)
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'items'
+  ) then
+    alter publication supabase_realtime add table public.items;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'attachments'
+  ) then
+    alter publication supabase_realtime add table public.attachments;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'activity_log'
+  ) then
+    alter publication supabase_realtime add table public.activity_log;
+  end if;
+end;
+$$;
 
 with workspace as (
   insert into public.workspaces (name)
@@ -165,3 +390,18 @@ from workspace,
   ('124 N Mantua', 9)
 ) as seed_units(unit_name, sort_order)
 on conflict do nothing;
+
+insert into public.workspace_members (workspace_id, email, role)
+select workspace.id, member.email, member.role
+from public.workspaces workspace
+cross join (values
+  ('sethtipton@gmail.com', 'owner'),
+  ('jillianrtipton@gmail.com', 'editor'),
+  ('morgantipton@gmail.com', 'editor'),
+  ('ben.tipton@gmail.com', 'editor'),
+  ('bgatipton@gmail.com', 'editor'),
+  ('ryantipton@gmail.com', 'editor'),
+  ('threeoakllc@gmail.com', 'editor')
+) as member(email, role)
+where workspace.name = 'Tipton Rentals'
+on conflict (workspace_id, email) do update set role = excluded.role;

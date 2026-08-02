@@ -66,6 +66,33 @@ export async function loadItems(unitId) {
   return data || [];
 }
 
+export async function loadActivityLog(unitId) {
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select("*")
+    .eq("unit_id", unitId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export function watchUnitData(unitId, callback) {
+  if (!supabase || !unitId) return () => {};
+
+  const channel = supabase
+    .channel(`unit-${unitId}-${crypto.randomUUID()}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "items", filter: `unit_id=eq.${unitId}` }, callback)
+    .on("postgres_changes", { event: "*", schema: "public", table: "attachments", filter: `unit_id=eq.${unitId}` }, callback)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter: `unit_id=eq.${unitId}` }, callback)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 export async function addItem(item) {
   const { data, error } = await supabase.from("items").insert(item).select().single();
   if (error) throw error;
@@ -82,6 +109,23 @@ export async function updateItem(id, patch) {
 
   if (error) throw error;
   return data;
+}
+
+export async function updateItemsStatus(ids, status) {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("items")
+    .update({
+      status,
+      completed_at: status === "done" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", ids)
+    .select();
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function deleteItem(id) {

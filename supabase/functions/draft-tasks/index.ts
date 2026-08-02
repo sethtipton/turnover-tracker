@@ -1,15 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.111.0";
 
-const allowedEmails = new Set([
-  "jillianrtipton@gmail.com",
-  "morgantipton@gmail.com",
-  "ben.tipton@gmail.com",
-  "bgatipton@gmail.com",
-  "ryantipton@gmail.com",
-  "sethtipton@gmail.com",
-  "threeoakllc@gmail.com",
-]);
-
 type TaskDraftItem = {
   title: string;
   note: string;
@@ -75,9 +65,8 @@ export default {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
-      const email = user?.email?.toLowerCase();
-      if (userError || !email || !allowedEmails.has(email)) {
-        return jsonResponse({ error: "Access is limited to approved Tipton Rentals users." }, 403);
+      if (userError || !user) {
+        return jsonResponse({ error: "Authentication required." }, 401);
       }
 
       const { unitId, dictationItemId, attachmentId } = await request.json();
@@ -90,7 +79,9 @@ export default {
         .select("id, workspace_id, name")
         .eq("id", unitId)
         .single();
-      if (unitError) throw unitError;
+      if (unitError || !unit) {
+        return jsonResponse({ error: "You do not have access to this property." }, 403);
+      }
 
       const { data: attachment, error: attachmentError } = await supabase
         .from("attachments")

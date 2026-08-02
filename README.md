@@ -27,7 +27,7 @@ Turnover Tracker
 https://gholbnyvijfyqdwqgjan.supabase.co
 ```
 
-1. In Supabase SQL Editor, run `supabase/schema.sql`.
+1. For a new project, run `supabase/schema.sql` in the Supabase SQL Editor. For the existing project, apply the versioned migrations in `supabase/migrations`.
 2. In Authentication > URL Configuration, set the Site URL:
    - `https://sethtipton.github.io/turnover-tracker`
 3. Add these redirect URLs in Authentication > URL Configuration:
@@ -45,6 +45,8 @@ https://gholbnyvijfyqdwqgjan.supabase.co
 6. Copy the project URL and publishable key into `.env.local`.
 
 Google auth is configured for the hosted app and local Vite development. While the Google OAuth app is in testing mode, family accounts must be listed as Google test users before they can sign in.
+
+Workspace access is stored in `public.workspace_members`. The initial Tipton Rentals members are seeded by the schema and membership migration. Owners can manage membership; editors can update units, tasks, materials, and attachments; viewers have read-only access.
 
 ## OpenAI Credential Setup
 
@@ -102,5 +104,7 @@ https://sethtipton.github.io/turnover-tracker/
 
 ```bash
 npm run build
-npm run deploy
+git push origin main
 ```
+
+GitHub Actions builds and deploys the app to GitHub Pages after each push to `main`.

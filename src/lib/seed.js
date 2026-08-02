@@ -1,15 +1,5 @@
 export const WORKSPACE_NAME = "Tipton Rentals";
 
-export const ALLOWED_EMAILS = [
-  "jillianrtipton@gmail.com",
-  "morgantipton@gmail.com",
-  "ben.tipton@gmail.com",
-  "bgatipton@gmail.com",
-  "ryantipton@gmail.com",
-  "sethtipton@gmail.com",
-  "threeoakllc@gmail.com",
-];
-
 export const INITIAL_UNITS = [
   "451 Upstairs",
   "451 Downstairs",
