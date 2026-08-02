@@ -1,5 +1,9 @@
-import { ClipboardList, LogOut, Mic } from "lucide-react";
-import { getPropertyImage, getPropertyImageTransitionName } from "../lib/propertyImages";
+import { LogOut, Mic, Wrench } from "lucide-react";
+import {
+  getPropertyImage,
+  getPropertyImageTransitionName,
+  getPropertyTitleTransitionName,
+} from "../lib/propertyImages";
 
 export function AppHeader({
   property,
@@ -12,22 +16,34 @@ export function AppHeader({
   onStartDictation,
   onStopDictation,
   onSignOut,
+  scopeSelector,
 }) {
   const isRecording = dictationState === "recording";
   const propertyImage = getPropertyImage(property?.name);
+  const headerClassName = [
+    "app-header",
+    propertyImage && "has-property-image",
+    scopeSelector && "has-scope-selector",
+  ].filter(Boolean).join(" ");
 
   return (
-    <header className="app-header">
+    <header className={headerClassName}>
+      {propertyImage && (
+        <div
+          className="app-header-property-image"
+          style={{ viewTransitionName: getPropertyImageTransitionName(property.id) }}
+        >
+          <img src={propertyImage} alt="" width="1024" height="768" />
+        </div>
+      )}
       <div className="app-header-identity">
-        {propertyImage && (
-          <div
-            className="app-header-property-image"
-            style={{ viewTransitionName: getPropertyImageTransitionName(property.id) }}
-          >
-            <img src={propertyImage} alt="" width="1024" height="768" />
-          </div>
-        )}
-        <h1 id="app-title" tabIndex="-1">{scopeTitle || "Turnover Tracker"}</h1>
+        <h1
+          id="app-title"
+          tabIndex="-1"
+          style={{ viewTransitionName: getPropertyTitleTransitionName(property?.id) }}
+        >
+          {scopeTitle || "Turnover Tracker"}
+        </h1>
       </div>
       <div className="header-actions" aria-label="Workspace actions">
         {!workMode && hasSelectedProperty && (
@@ -63,7 +79,7 @@ export function AppHeader({
             onClick={onToggleWorkMode}
             aria-pressed={workMode}
           >
-            <ClipboardList size={17} aria-hidden="true" />
+            <Wrench size={18} aria-hidden="true" />
             <span className="action-label">Work Mode</span>
           </button>
         )}
@@ -74,6 +90,7 @@ export function AppHeader({
           </button>
         )}
       </div>
+      {scopeSelector}
     </header>
   );
 }

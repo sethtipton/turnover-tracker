@@ -353,17 +353,17 @@ function App() {
             onStartDictation={startDictation}
             onStopDictation={stopDictation}
             onSignOut={signOut}
+            scopeSelector={!workMode && selectedProperty ? (
+              <ScopeSelector
+                properties={properties}
+                units={units}
+                selectedPropertyId={selectedPropertyId}
+                selectedUnitId={selectedUnitId}
+                onPropertyChange={handlePropertyChange}
+                onUnitChange={handleUnitChange}
+              />
+            ) : null}
           />
-          {!workMode && selectedProperty && (
-            <ScopeSelector
-              properties={properties}
-              units={units}
-              selectedPropertyId={selectedPropertyId}
-              selectedUnitId={selectedUnitId}
-              onPropertyChange={handlePropertyChange}
-              onUnitChange={handleUnitChange}
-            />
-          )}
         </div>
 
         {selectedProperty ? (

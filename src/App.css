@@ -15,7 +15,7 @@
     padding-block: 1rem 2.5rem;
   }
 
-  :where(.app-header, .scope-select-bar, .summary-grid, .control-bar, .work-grid, .panel, .message, .portfolio-home) {
+  :where(.app-header, .summary-grid, .control-bar, .work-grid, .panel, .message, .portfolio-home) {
     width: var(--content-width);
     margin-inline: auto;
   }
@@ -129,17 +129,43 @@
     & .eyebrow { display: none; }
   }
 
+  .app-header.has-property-image {
+    --header-image-width: clamp(6rem, 24vw, 8rem);
+    grid-template-columns: var(--header-image-width) minmax(0, 1fr);
+
+    & .app-header-property-image {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+
+    & .app-header-identity {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: end;
+    }
+
+    & .header-actions {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: end;
+    }
+  }
+
+  .app-header.has-property-image.has-scope-selector {
+    & .scope-select-bar {
+      grid-column: 1 / -1;
+      grid-row: 3;
+    }
+  }
+
   .app-header-identity {
-    display: flex;
     min-width: 0;
-    align-items: center;
-    gap: 0.75rem;
   }
 
   .app-header-property-image {
-    width: 4.5rem;
-    aspect-ratio: 4 / 3;
-    flex: 0 0 auto;
+    width: var(--header-image-width, 8rem);
+    min-height: 0;
+    align-self: stretch;
     overflow: clip;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
@@ -160,12 +186,16 @@
 
   .header-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 3rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     justify-content: flex-end;
 
     &:has(.sign-out-button:only-child) {
       grid-template-columns: 3rem;
       justify-content: end;
+    }
+
+    &:has(.work-mode-button:only-child) {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     & button {
@@ -234,14 +264,15 @@
 
   .scope-select-bar {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    justify-content: end;
-    gap: 0.75rem;
-    padding-block: 0.375rem 0.25rem;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    padding-block: 0.125rem 0.25rem;
 
     & select {
       background-color: var(--color-surface);
       font-weight: 800;
+      white-space: nowrap;
     }
   }
 
@@ -358,7 +389,7 @@
     display: grid;
     grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
     overflow: clip;
-    border: 1px solid var(--color-border);
+    border: 1px solid color-mix(in oklab, var(--color-primary) 58%, var(--color-border));
     border-radius: var(--radius-panel);
     background: var(--color-surface);
     box-shadow: var(--shadow-raised);
@@ -1011,34 +1042,33 @@
   }
 
   .item-main {
-    display: grid;
-    grid-template-columns: 2.75rem minmax(0, 1fr);
-    align-items: start;
-    gap: 0.625rem;
+    min-width: 0;
   }
 
   .item-summary {
     display: grid;
     gap: 0.25rem;
 
-    & > p { padding-inline-end: 3.5rem; }
-    &.has-labeled-edit > p { padding-inline-end: 5.75rem; }
+    & > p { padding-inline-start: calc(2.75rem + 0.625rem); }
+
+    &.without-completion > p { padding-inline-start: 0; }
   }
 
   .item-title-row {
-    position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    padding-inline-end: 3.5rem;
-
-    &.has-labeled-edit { padding-inline-end: 5.75rem; }
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    align-items: center;
+    gap: 0.625rem;
 
     & h3 {
-      padding-block: 0.2rem 0.05rem;
       font-size: 1.3rem;
       font-weight: 800;
       line-height: 1.25;
       overflow-wrap: anywhere;
+    }
+
+    &.without-completion {
+      grid-template-columns: minmax(0, 1fr) 2.75rem;
     }
   }
 
@@ -1067,25 +1097,15 @@
     padding: 0;
     border-color: var(--color-control-border);
     background: transparent;
-    color: var(--color-primary);
+    color: var(--color-text-muted);
   }
+
+  .check-button:hover { color: var(--color-primary-hover); }
 
   .edit-title-button {
     color: var(--color-text-muted);
 
     &:hover { color: var(--color-primary-hover); }
-  }
-
-  .item-title-row > :where(.edit-title-button, .edit-item-button) {
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-end: 0;
-    transform: translateY(-50%);
-  }
-
-  .edit-item-button {
-    min-height: 2.75rem;
-    padding: 0.4375rem 0.75rem;
   }
 
   .danger-icon-button {
@@ -1220,6 +1240,28 @@
       & h1 { font-size: 3rem; }
     }
 
+    .app-header.has-property-image {
+      --header-image-width: 8rem;
+      grid-template-columns: var(--header-image-width) minmax(0, 1fr) minmax(16rem, 22rem);
+
+      & .header-actions {
+        display: grid;
+        grid-column: 2;
+        grid-row: 2;
+
+        & button {
+          width: 100%;
+          padding-inline: 0.625rem;
+        }
+      }
+
+      &.has-scope-selector .scope-select-bar {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        padding-block: 0;
+      }
+    }
+
     .header-actions {
       display: flex;
 
@@ -1247,13 +1289,36 @@
       }
     }
 
-    .scope-select-bar {
-      grid-template-columns: repeat(2, minmax(12rem, 22.5rem));
-      padding-block: 0.375rem 0.875rem;
-    }
   }
 
   @media (max-width: 52rem) {
+    .app-header.has-property-image .header-actions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      & .dictation-control {
+        grid-column: auto;
+      }
+
+      & .action-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      & .sign-out-button { width: 100%; }
+
+      &:has(.work-mode-button:only-child) {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .item-title-row {
+      align-items: start;
+    }
+
     :where(.portfolio-intro, .directory-heading) {
       display: grid;
       align-items: start;
@@ -1331,7 +1396,18 @@
     min-height: 3rem;
   }
 
-  .item-main {
-    grid-template-columns: 3rem minmax(0, 1fr);
+  .item-title-row {
+    grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+    align-items: start;
+  }
+
+  .item-summary > p {
+    padding-inline-start: calc(3rem + 0.625rem);
+  }
+
+  .item-summary.without-completion > p { padding-inline-start: 0; }
+
+  .item-title-row.without-completion {
+    grid-template-columns: minmax(0, 1fr) 3rem;
   }
 }

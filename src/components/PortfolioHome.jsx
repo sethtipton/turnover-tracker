@@ -7,7 +7,11 @@ import {
   ClipboardCheck,
   ShoppingCart,
 } from "lucide-react";
-import { getPropertyImage, getPropertyImageTransitionName } from "../lib/propertyImages";
+import {
+  getPropertyImage,
+  getPropertyImageTransitionName,
+  getPropertyTitleTransitionName,
+} from "../lib/propertyImages";
 import { getScopePath } from "../lib/routing";
 
 export function PortfolioHome({
@@ -82,6 +86,13 @@ function getPossessiveName(name) {
   return name.endsWith("s") ? `${name}'` : `${name}'s`;
 }
 
+function getScopeButtonLabel(scope) {
+  if (!scope.unit) return "Property";
+  if (scope.label === "UP") return "Up";
+  if (scope.label === "DOWN") return "Down";
+  return scope.label;
+}
+
 function ContinuePanel({ summary, busy, onOpenScope }) {
   const { property, continueUnit, progress, done, total, open, pending } = summary;
   const scopeLabel = continueUnit?.name || "Whole Property";
@@ -110,11 +121,11 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
             unit={continueUnit}
             onOpenScope={onOpenScope}
           >
-            Continue in {scopeLabel} <ArrowRight size={17} aria-hidden="true" />
+            {continueUnit ? `Continue in ${scopeLabel}` : "Continue to Property"} <ArrowRight size={17} aria-hidden="true" />
           </ScopeLink>
           {continueUnit && (
             <ScopeLink className="secondary-link" property={property} onOpenScope={onOpenScope}>
-              Whole Property
+              Property
             </ScopeLink>
           )}
         </div>
@@ -135,7 +146,9 @@ function PropertyCard({ summary, busy, onOpenScope }) {
       />
       <div className="property-card-body">
         <div className="property-card-heading">
-          <h3>{property.name}</h3>
+          <h3 style={{ viewTransitionName: getPropertyTitleTransitionName(property.id) }}>
+            {property.name}
+          </h3>
           {status && (
             <span className={`property-state property-state-${status.tone}`}>
               {status.tone === "done" && <CheckCircle2 size={14} aria-hidden="true" />}
@@ -160,7 +173,7 @@ function PropertyCard({ summary, busy, onOpenScope }) {
               unit={scope.unit}
               onOpenScope={onOpenScope}
             >
-              <span className="property-scope-label">{scope.label}</span>
+              <span className="property-scope-label">{getScopeButtonLabel(scope)}</span>
               {scope.pending > 0 && (
                 <span className="property-state property-state-review">
                   <AlertCircle size={14} aria-hidden="true" />

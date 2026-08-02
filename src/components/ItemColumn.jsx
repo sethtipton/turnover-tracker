@@ -62,16 +62,11 @@ export function ItemColumn({
                 style={{ viewTransitionName: `item-${item.id}` }}
               >
                 <div className="item-main">
-                  <button
-                    className="check-button"
-                    type="button"
-                    onClick={() => handleStatusChange(item, item.status === "done" ? "approved" : "done")}
-                    aria-label={item.status === "done" ? `Mark ${item.title} not done` : `Mark ${item.title} done`}
-                    aria-pressed={item.status === "done"}
-                  >
-                    {item.status === "done" && <Check size={15} aria-hidden="true" />}
-                  </button>
-                  <EditableItem item={item} onSave={handleItemChange} />
+                  <EditableItem
+                    item={item}
+                    onSave={handleItemChange}
+                    onToggleCompletion={() => handleStatusChange(item, item.status === "done" ? "approved" : "done")}
+                  />
                 </div>
                 {!compact && (
                   <ItemActions
@@ -137,7 +132,7 @@ function ItemActions({ item, onStatus, onDelete, onUpload }) {
   );
 }
 
-export function EditableItem({ item, onSave, showEditLabel = false }) {
+export function EditableItem({ item, onSave, onToggleCompletion }) {
   const [draft, setDraft] = useState(() => getItemEditDraft(item));
   const [isEditing, setIsEditing] = useState(false);
 
@@ -164,17 +159,27 @@ export function EditableItem({ item, onSave, showEditLabel = false }) {
 
   if (!isEditing) {
     return (
-      <div className={`item-summary ${showEditLabel ? "has-labeled-edit" : ""}`}>
-        <div className={`item-title-row ${showEditLabel ? "has-labeled-edit" : ""}`}>
+      <div className={onToggleCompletion ? "item-summary" : "item-summary without-completion"}>
+        <div className={onToggleCompletion ? "item-title-row" : "item-title-row without-completion"}>
+          {onToggleCompletion && (
+            <button
+              className="check-button"
+              type="button"
+              onClick={onToggleCompletion}
+              aria-label={item.status === "done" ? `Mark ${item.title} not done` : `Mark ${item.title} done`}
+              aria-pressed={item.status === "done"}
+            >
+              <Check size={15} aria-hidden="true" />
+            </button>
+          )}
           <h3>{item.title}</h3>
           <button
-            className={showEditLabel ? "ghost edit-item-button" : "icon-button edit-title-button"}
+            className="icon-button edit-title-button"
             type="button"
             onClick={() => setIsEditing(true)}
             aria-label={`Edit ${item.title}`}
           >
             <Pencil size={16} aria-hidden="true" />
-            {showEditLabel && <span>Edit</span>}
           </button>
         </div>
         {item.note && <p>{item.note}</p>}

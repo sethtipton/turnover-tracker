@@ -31,3 +31,9 @@ export function getPropertyImageTransitionName(propertyId) {
   const safeId = String(propertyId).replace(/[^a-zA-Z0-9_-]/g, "-");
   return `property-image-${safeId}`;
 }
+
+export function getPropertyTitleTransitionName(propertyId) {
+  if (!propertyId) return undefined;
+  const safeId = String(propertyId).replace(/[^a-zA-Z0-9_-]/g, "-");
+  return `property-title-${safeId}`;
+}
