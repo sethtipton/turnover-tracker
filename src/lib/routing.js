@@ -2,6 +2,27 @@ import { UNIT_ROUTE_ALIASES } from "./seed";
 
 const basePath = normalizeBasePath(import.meta.env.BASE_URL);
 
+const LEGACY_PROPERTY_ROUTES = {
+  "451": { propertyName: "451 Park" },
+  "451-up": { propertyName: "451 Park", unitName: "UP" },
+  "451-upstairs": { propertyName: "451 Park", unitName: "UP" },
+  "451-down": { propertyName: "451 Park", unitName: "DOWN" },
+  "451-downstairs": { propertyName: "451 Park", unitName: "DOWN" },
+  "441": { propertyName: "441 Park" },
+  "441-up": { propertyName: "441 Park", unitName: "UP" },
+  "441-upstairs": { propertyName: "441 Park", unitName: "UP" },
+  "441-down": { propertyName: "441 Park", unitName: "DOWN" },
+  "441-downstairs": { propertyName: "441 Park", unitName: "DOWN" },
+  "1065-hudson-rd": { propertyName: "1065/1067 Hudson", unitName: "1065" },
+  "1065-hudson-rd-main-unit": { propertyName: "1065/1067 Hudson", unitName: "1065" },
+  "1067-hudson-rd": { propertyName: "1065/1067 Hudson", unitName: "1067" },
+  "1067-hudson-rd-main-unit": { propertyName: "1065/1067 Hudson", unitName: "1067" },
+  "124-n-mantua": { propertyName: "124/126 N Mantua", unitName: "124" },
+  "124-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "124" },
+  "126-n-mantua": { propertyName: "124/126 N Mantua", unitName: "126" },
+  "126-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "126" },
+};
+
 export function normalizeBasePath(path) {
   if (!path || path === "/") return "/";
   return path.endsWith("/") ? path : `${path}/`;
@@ -31,6 +52,24 @@ export function getScopeFromCurrentPath(properties, units) {
       ))
       : null;
     return { propertyId: property.id, unitId: unit?.id || "" };
+  }
+
+  const legacyRoute = LEGACY_PROPERTY_ROUTES[routeParts[0]];
+  if (legacyRoute) {
+    const legacyProperty = properties.find((candidate) => candidate.name === legacyRoute.propertyName);
+    const unitSlug = legacyRoute.unitName
+      ? getSlug(legacyRoute.unitName).toLowerCase()
+      : routeParts[1];
+    const legacyRouteUnit = unitSlug
+      ? units.find((candidate) => (
+        candidate.property_id === legacyProperty?.id
+        && getUnitRouteSlugs(candidate.name).includes(unitSlug)
+      ))
+      : null;
+
+    if (legacyProperty) {
+      return { propertyId: legacyProperty.id, unitId: legacyRouteUnit?.id || "" };
+    }
   }
 
   const legacyUnit = units.find((candidate) => {

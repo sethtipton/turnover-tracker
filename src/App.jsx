@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { ClipboardList, Hammer, Mic, ShoppingCart } from "lucide-react";
 import "./App.css";
 import { ActivityLog } from "./components/ActivityLog";
@@ -101,6 +102,7 @@ function App() {
 
   const busy = itemsBusy || dictationBusy;
   const userEmail = session?.user?.email?.toLowerCase();
+  const userDisplayName = getUserDisplayName(session?.user);
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId) || null;
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
   const selectedScopeTitle = selectedProperty
@@ -226,9 +228,28 @@ function App() {
     const unit = units.find((candidate) => (
       candidate.id === unitId && candidate.property_id === propertyId
     )) || null;
-    setSelectedPropertyId(property?.id || "");
-    setSelectedUnitId(unit?.id || "");
-    updateScopePath(property, unit);
+    function updateScope() {
+      flushSync(() => {
+        setSelectedPropertyId(property?.id || "");
+        setSelectedUnitId(unit?.id || "");
+      });
+      window.scrollTo(0, 0);
+      updateScopePath(property, unit);
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!document.startViewTransition || reduceMotion) {
+      updateScope();
+      requestAnimationFrame(focusAppTitle);
+      return;
+    }
+
+    const transition = document.startViewTransition(updateScope);
+    transition.finished.finally(focusAppTitle);
+  }
+
+  function focusAppTitle() {
+    document.querySelector("#app-title")?.focus({ preventScroll: true });
   }
 
   async function handleAddItem(event) {
@@ -322,6 +343,7 @@ function App() {
       <main className={`app-shell ${workMode ? "work-mode" : ""}`} id="main-content" tabIndex="-1">
         <div className="workspace-top">
           <AppHeader
+            property={selectedProperty}
             scopeTitle={selectedScopeTitle}
             hasSelectedProperty={Boolean(selectedProperty)}
             workMode={workMode}
@@ -349,7 +371,7 @@ function App() {
         ) : (
           <>
             <PortfolioHome
-              workspaceName={workspace?.name || "Tipton Rentals"}
+              displayName={userDisplayName}
               properties={properties}
               units={units}
               items={portfolioItems}
@@ -415,6 +437,14 @@ function App() {
       </main>
     </>
   );
+}
+
+function getUserDisplayName(user) {
+  const profileName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+  if (profileName?.trim()) return profileName.trim();
+
+  const emailUsername = user?.email?.split("@")[0]?.trim();
+  return emailUsername || "Signed-in user";
 }
 
 export default App;

@@ -1,6 +1,8 @@
 import { ClipboardList, LogOut, Mic } from "lucide-react";
+import { getPropertyImage, getPropertyImageTransitionName } from "../lib/propertyImages";
 
 export function AppHeader({
+  property,
   scopeTitle,
   hasSelectedProperty,
   workMode,
@@ -12,12 +14,20 @@ export function AppHeader({
   onSignOut,
 }) {
   const isRecording = dictationState === "recording";
+  const propertyImage = getPropertyImage(property?.name);
 
   return (
     <header className="app-header">
-      <div>
-        <p className="eyebrow">Turnover Tracker</p>
-        <h1 id="app-title">{scopeTitle || "Turnover Tracker"}</h1>
+      <div className="app-header-identity">
+        {propertyImage && (
+          <div
+            className="app-header-property-image"
+            style={{ viewTransitionName: getPropertyImageTransitionName(property.id) }}
+          >
+            <img src={propertyImage} alt="" width="1024" height="768" />
+          </div>
+        )}
+        <h1 id="app-title" tabIndex="-1">{scopeTitle || "Turnover Tracker"}</h1>
       </div>
       <div className="header-actions" aria-label="Workspace actions">
         {!workMode && hasSelectedProperty && (

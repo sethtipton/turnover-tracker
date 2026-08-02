@@ -1,0 +1,62 @@
+[
+  {
+    "id": "451-park-ave",
+    "address": "451 Park Ave, Kent, OH 44240",
+    "rawImage": "../raw/451-park-ave.png",
+    "processedImage": "../processed/451-park-ave.webp"
+  },
+  {
+    "id": "441-park-ave",
+    "address": "441 Park Ave, Kent, OH 44240",
+    "rawImage": "../raw/441-park-ave.png",
+    "processedImage": "../processed/441-park-ave.webp"
+  },
+  {
+    "id": "1065-hudson-rd",
+    "address": "1065 Hudson Rd, Kent, OH 44240",
+    "rawImage": "../raw/1065-hudson-rd.png",
+    "processedImage": "../processed/1065-hudson-rd.webp"
+  },
+  {
+    "id": "4-vine-ct",
+    "address": "4 Vine Ct, Kent, OH 44240",
+    "rawImage": "../raw/4-vine-ct.png",
+    "processedImage": "../processed/4-vine-ct.webp"
+  },
+  {
+    "id": "124-n-mantua-st",
+    "address": "124 N Mantua St, Kent, OH 44240",
+    "rawImage": "../raw/124-n-mantua-st.png",
+    "processedImage": "../processed/124-n-mantua-st.webp"
+  },
+  {
+    "id": "469-carthage-ave",
+    "address": "469 Carthage Ave, Kent, OH 44240",
+    "rawImage": "../raw/469-carthage-ave.png",
+    "processedImage": "../processed/469-carthage-ave.webp"
+  },
+  {
+    "id": "458-w-main-st",
+    "address": "458 W Main St, Kent, OH 44240",
+    "rawImage": "../raw/458-w-main-st.png",
+    "processedImage": "../processed/458-w-main-st.webp"
+  },
+  {
+    "id": "127-s-pearl-st",
+    "address": "127 S Pearl St, Kent, OH 44240",
+    "rawImage": "../raw/127-s-pearl-st.png",
+    "processedImage": "../processed/127-s-pearl-st.webp"
+  },
+  {
+    "id": "322-park-ave",
+    "address": "322 Park Ave, Kent, OH 44240",
+    "rawImage": "../raw/322-park-ave.png",
+    "processedImage": "../processed/322-park-ave.webp"
+  },
+  {
+    "id": "310-park-ave",
+    "address": "310 Park Ave, Kent, OH 44240",
+    "rawImage": "../raw/310-park-ave.png",
+    "processedImage": "../processed/310-park-ave.webp"
+  }
+]

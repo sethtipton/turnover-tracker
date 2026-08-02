@@ -437,18 +437,16 @@ insert into public.properties (workspace_id, name, sort_order)
 select workspace.id, seed.name, seed.sort_order
 from public.workspaces workspace
 cross join (values
-  ('451', 1),
-  ('441', 2),
-  ('1065 Hudson Rd', 3),
-  ('1067 Hudson Rd', 4),
-  ('4 Vine Ct', 5),
-  ('126 N Mantua', 6),
-  ('124 N Mantua', 7),
-  ('469 Carthage', 8),
-  ('458 W Main', 9),
-  ('127 S Pearl', 10),
-  ('322 Park', 11),
-  ('310 Park', 12)
+  ('451 Park', 1),
+  ('441 Park', 2),
+  ('1065/1067 Hudson', 3),
+  ('4 Vine Ct', 4),
+  ('124/126 N Mantua', 5),
+  ('469 Carthage', 6),
+  ('458 W Main', 7),
+  ('127 S Pearl', 8),
+  ('322 Park', 9),
+  ('310 Park', 10)
 ) as seed(name, sort_order)
 where workspace.name = 'Tipton Rentals'
 on conflict (workspace_id, name) do update set sort_order = excluded.sort_order;
@@ -458,15 +456,15 @@ select workspace.id, property.id, seed.unit_name, seed.sort_order
 from public.workspaces workspace
 join public.properties property on property.workspace_id = workspace.id
 join (values
-  ('451', 'UP', 1),
-  ('451', 'DOWN', 2),
-  ('441', 'UP', 1),
-  ('441', 'DOWN', 2),
-  ('1065 Hudson Rd', 'Main Unit', 1),
-  ('1067 Hudson Rd', 'Main Unit', 1),
+  ('451 Park', 'UP', 1),
+  ('451 Park', 'DOWN', 2),
+  ('441 Park', 'UP', 1),
+  ('441 Park', 'DOWN', 2),
+  ('1065/1067 Hudson', '1065', 1),
+  ('1065/1067 Hudson', '1067', 2),
   ('4 Vine Ct', 'Main Unit', 1),
-  ('126 N Mantua', 'Main Unit', 1),
-  ('124 N Mantua', 'Main Unit', 1),
+  ('124/126 N Mantua', '124', 1),
+  ('124/126 N Mantua', '126', 2),
   ('469 Carthage', 'Main Unit', 1),
   ('458 W Main', 'UP', 1),
   ('458 W Main', 'DOWN', 2),

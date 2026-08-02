@@ -1,0 +1,145 @@
+[
+  {
+    "id": "451-park-ave",
+    "address": "451 Park Ave, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": {
+      "width": 1280,
+      "height": 720
+    },
+    "crop": {
+      "left": 280,
+      "top": 60,
+      "width": 880,
+      "height": 660
+    },
+    "finalDimensions": {
+      "width": 1024,
+      "height": 768
+    },
+    "outputPath": "../processed/451-park-ave.webp",
+    "notes": "Confirmed exact Maps result. Used the direct frontal May 2019 Google Street View capture; mature trees and overhead utility lines are visible but the full front facade is clear."
+  },
+  {
+    "id": "441-park-ave",
+    "address": "441 Park Ave, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": {
+      "width": 1280,
+      "height": 720
+    },
+    "crop": {
+      "left": 280,
+      "top": 60,
+      "width": 880,
+      "height": 660
+    },
+    "finalDimensions": {
+      "width": 1024,
+      "height": 768
+    },
+    "outputPath": "../processed/441-park-ave.webp",
+    "notes": "Confirmed exact Maps result. Used the official May 2019 Google Street View capture instead of the newer user-contributed panorama. A mature tree unavoidably obscures part of the front facade."
+  },
+  {
+    "id": "1065-hudson-rd",
+    "address": "1065 Hudson Rd, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": {
+      "width": 1280,
+      "height": 720
+    },
+    "crop": {
+      "left": 440,
+      "top": 210,
+      "width": 680,
+      "height": 510
+    },
+    "finalDimensions": {
+      "width": 1024,
+      "height": 768
+    },
+    "outputPath": "../processed/1065-hudson-rd.webp",
+    "notes": "Corrected after review: the subject is the recessed white two-story house north of the large foreground neighbor. Used the September 2021 Google Street View capture and centered the white house; a tree and the property's setback limit facade detail."
+  },
+  {
+    "id": "4-vine-ct",
+    "address": "4 Vine Ct, Kent, OH 44240",
+    "status": "needs-review",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/4-vine-ct.webp",
+    "notes": "Exact Maps result confirmed. Available October 2020 coverage shows a fenced, heavily wooded gable view; the front facade cannot be identified confidently."
+  },
+  {
+    "id": "124-n-mantua-st",
+    "address": "124 N Mantua St, Kent, OH 44240",
+    "status": "needs-review",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/124-n-mantua-st.webp",
+    "notes": "Exact Maps marker confirmed, but the May 2019 panorama is labeled 126 N Mantua St and shows multiple adjacent facades. The crop centers the gray house aligned with the 124 marker; property confirmation is recommended."
+  },
+  {
+    "id": "469-carthage-ave",
+    "address": "469 Carthage Ave, Kent, OH 44240",
+    "status": "needs-review",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 360, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/469-carthage-ave.webp",
+    "notes": "Exact Maps result confirmed, but the May 2019 panorama is labeled 468 Carthage Ave across the street. The crop centers the house and driveway aimed at by the 469 marker; property confirmation is recommended."
+  },
+  {
+    "id": "458-w-main-st",
+    "address": "458 W Main St, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/458-w-main-st.webp",
+    "notes": "Exact address and July 2025 Street View label confirmed. Direct frontal view with the blue-green house centered."
+  },
+  {
+    "id": "127-s-pearl-st",
+    "address": "127 S Pearl St, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/127-s-pearl-st.webp",
+    "notes": "Exact address and July 2025 Street View label confirmed. Utility workers and excavations unavoidably appear in the foreground."
+  },
+  {
+    "id": "322-park-ave",
+    "address": "322 Park Ave, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/322-park-ave.webp",
+    "notes": "Exact Maps result confirmed. October 2020 view centers the house across from the panorama position labeled 321 Park Ave; mature trees and a parked vehicle partly obstruct the exterior."
+  },
+  {
+    "id": "310-park-ave",
+    "address": "310 Park Ave, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/310-park-ave.webp",
+    "notes": "Exact Maps result confirmed as the Bell Tower Brewing building. October 2020 panorama position is labeled 314 Park Ave; parked cars and a tree partly obstruct the building."
+  }
+]

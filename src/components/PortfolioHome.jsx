@@ -5,13 +5,13 @@ import {
   Building2,
   CheckCircle2,
   ClipboardCheck,
-  Clock3,
   ShoppingCart,
 } from "lucide-react";
+import { getPropertyImage, getPropertyImageTransitionName } from "../lib/propertyImages";
 import { getScopePath } from "../lib/routing";
 
 export function PortfolioHome({
-  workspaceName,
+  displayName,
   properties,
   units,
   items,
@@ -27,7 +27,6 @@ export function PortfolioHome({
   if (properties.length === 0 && !busy) {
     return (
       <section className="portfolio-home portfolio-empty" aria-labelledby="portfolio-title">
-        <p className="eyebrow">{workspaceName}</p>
         <h2 id="portfolio-title">No properties available</h2>
         <p>Your account does not currently have access to a property.</p>
       </section>
@@ -37,14 +36,9 @@ export function PortfolioHome({
   return (
     <div className="portfolio-home" aria-busy={busy}>
       <header className="portfolio-intro">
-        <div>
-          <p className="eyebrow">{workspaceName}</p>
-          <h2 id="portfolio-title">Property portfolio</h2>
-        </div>
-        <span className="portfolio-count">
-          <Building2 size={18} aria-hidden="true" />
-          {busy ? "Loading work..." : `${properties.length} ${properties.length === 1 ? "property" : "properties"}`}
-        </span>
+        <h2 id="portfolio-title">
+          {getPossessiveName(displayName)} {properties.length} {properties.length === 1 ? "Property" : "Properties"}
+        </h2>
       </header>
 
       <dl className="portfolio-summary" aria-label="Portfolio work summary">
@@ -69,11 +63,10 @@ export function PortfolioHome({
           </div>
         </div>
         <ul className="property-grid" role="list">
-          {overview.properties.map((summary, index) => (
+          {overview.properties.map((summary) => (
             <li key={summary.property.id}>
               <PropertyCard
                 summary={summary}
-                accentIndex={index}
                 busy={busy}
                 onOpenScope={onOpenScope}
               />
@@ -85,8 +78,12 @@ export function PortfolioHome({
   );
 }
 
+function getPossessiveName(name) {
+  return name.endsWith("s") ? `${name}'` : `${name}'s`;
+}
+
 function ContinuePanel({ summary, busy, onOpenScope }) {
-  const { property, continueUnit, latestActivity, progress, done, total, open, pending } = summary;
+  const { property, continueUnit, progress, done, total, open, pending } = summary;
   const scopeLabel = continueUnit?.name || "Whole Property";
 
   return (
@@ -98,10 +95,6 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
           <h2 id="continue-title">{property.name}</h2>
           <p className="continue-scope">{scopeLabel}</p>
         </div>
-        <p className="continue-activity">
-          <Clock3 size={16} aria-hidden="true" />
-          {busy ? "Loading recent activity..." : getActivityDescription(latestActivity)}
-        </p>
         <div className="continue-progress">
           <ProgressBar value={done} total={total} label={`${property.name} completion`} />
           <span>{total > 0 ? `${progress}% complete` : "Ready for a walkthrough"}</span>
@@ -130,36 +123,50 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
   );
 }
 
-function PropertyCard({ summary, accentIndex, busy, onOpenScope }) {
-  const { property, units, done, total, open, shopping, latestActivity } = summary;
+function PropertyCard({ summary, busy, onOpenScope }) {
+  const { property, scopes, done, total, open, shopping } = summary;
   const status = getPropertyStatus(summary, busy);
 
   return (
-    <article className={`property-card property-accent-${accentIndex % 4}`}>
-      <PropertyVisual property={property} />
+    <article className="property-card">
+      <PropertyVisual
+        property={property}
+        transitionName={getPropertyImageTransitionName(property.id)}
+      />
       <div className="property-card-body">
         <div className="property-card-heading">
           <h3>{property.name}</h3>
-          <span className={`property-state property-state-${status.tone}`}>
-            {status.tone === "done" && <CheckCircle2 size={14} aria-hidden="true" />}
-            {status.tone === "review" && <AlertCircle size={14} aria-hidden="true" />}
-            {status.label}
-          </span>
+          {status && (
+            <span className={`property-state property-state-${status.tone}`}>
+              {status.tone === "done" && <CheckCircle2 size={14} aria-hidden="true" />}
+              {status.tone === "review" && <AlertCircle size={14} aria-hidden="true" />}
+              {status.label}
+            </span>
+          )}
         </div>
         <div className="property-progress-row">
+          {(busy || total > 0) && <span>{busy ? "Loading" : `${done}/${total}`}</span>}
           <ProgressBar value={done} total={total} label={`${property.name} completion`} />
-          <span>{busy ? "Loading" : total > 0 ? `${done}/${total} done` : "No work logged"}</span>
         </div>
         <div className="property-counts" aria-label={`${property.name} work counts`}>
           <span><ClipboardCheck size={15} aria-hidden="true" /> {busy ? "-" : open} open</span>
           <span><ShoppingCart size={15} aria-hidden="true" /> {busy ? "-" : shopping} shopping</span>
         </div>
-        <p className="property-latest">{busy ? "Loading activity..." : getActivityDescription(latestActivity)}</p>
         <nav className="property-scopes" aria-label={`Open ${property.name} scope`}>
-          <ScopeLink property={property} onOpenScope={onOpenScope}>Whole Property</ScopeLink>
-          {units.map((unit) => (
-            <ScopeLink key={unit.id} property={property} unit={unit} onOpenScope={onOpenScope}>
-              {unit.name}
+          {scopes.map((scope) => (
+            <ScopeLink
+              key={scope.unit?.id || "whole-property"}
+              property={property}
+              unit={scope.unit}
+              onOpenScope={onOpenScope}
+            >
+              <span className="property-scope-label">{scope.label}</span>
+              {scope.pending > 0 && (
+                <span className="property-state property-state-review">
+                  <AlertCircle size={14} aria-hidden="true" />
+                  {scope.pending} to review
+                </span>
+              )}
             </ScopeLink>
           ))}
         </nav>
@@ -168,22 +175,26 @@ function PropertyCard({ summary, accentIndex, busy, onOpenScope }) {
   );
 }
 
-function PropertyVisual({ property, priority = false }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const imageSrc = property.cover_image_url || property.image_url;
+function PropertyVisual({ property, priority = false, transitionName }) {
+  const [failedImageSrc, setFailedImageSrc] = useState("");
+  const imageSrc = getPropertyImage(property.name);
+  const imageAvailable = imageSrc && failedImageSrc !== imageSrc;
   const marker = getPropertyMarker(property.name);
 
   return (
-    <div className="property-visual">
-      {imageSrc && !imageFailed ? (
+    <div
+      className="property-visual"
+      style={transitionName ? { viewTransitionName: transitionName } : undefined}
+    >
+      {imageAvailable ? (
         <img
           src={imageSrc}
           alt={`Exterior of ${property.name}`}
-          width="900"
-          height="600"
+          width="1024"
+          height="768"
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedImageSrc(imageSrc)}
         />
       ) : (
         <div className="property-visual-fallback" aria-hidden="true">
@@ -243,6 +254,20 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
     ), null);
     const latestTimestamp = propertyActivity?.created_at || latestItem?.updated_at || null;
     const propertyUnits = units.filter((unit) => unit.property_id === property.id);
+    const scopes = [
+      {
+        unit: null,
+        label: "Whole Property",
+        pending: propertyItems.filter((item) => !item.unit_id && item.status === "pending-review").length,
+      },
+      ...propertyUnits.map((unit) => ({
+        unit,
+        label: unit.name,
+        pending: propertyItems.filter((item) => (
+          item.unit_id === unit.id && item.status === "pending-review"
+        )).length,
+      })),
+    ];
     const continueUnit = propertyActivity?.unit_id
       ? propertyUnits.find((unit) => unit.id === propertyActivity.unit_id) || null
       : null;
@@ -251,12 +276,7 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
 
     return {
       property,
-      units: propertyUnits,
-      latestActivity: propertyActivity || (latestItem ? {
-        action: latestItem.status === "done" ? "completed" : "updated",
-        label: latestItem.title,
-        created_at: latestItem.updated_at,
-      } : null),
+      scopes,
       latestTimestamp,
       continueUnit,
       done,
@@ -293,41 +313,12 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
 
 function getPropertyStatus(summary, busy) {
   if (busy) return { tone: "loading", label: "Loading" };
-  if (summary.pending > 0) return { tone: "review", label: `${summary.pending} to review` };
   if (summary.open > 0) return { tone: "open", label: `${summary.open} open` };
-  if (summary.total > 0) return { tone: "done", label: "All done" };
-  return { tone: "empty", label: "Ready" };
-}
-
-function getActivityDescription(activity) {
-  if (!activity) return "No recent activity";
-  const actionLabels = {
-    completed: "Completed",
-    created: "Added",
-    deleted: "Removed",
-    reopened: "Reopened",
-    updated: "Updated",
-    "status-changed": "Status changed",
-    "attachment-added": "Added an attachment to",
-    "attachment-removed": "Removed an attachment from",
-  };
-  const action = actionLabels[activity.action] || "Updated";
-  return `${action} ${activity.label} ${formatRelativeTime(activity.created_at)}`;
-}
-
-function formatRelativeTime(value) {
-  if (!value) return "";
-  const elapsedSeconds = Math.round((new Date(value).getTime() - Date.now()) / 1000);
-  const absoluteSeconds = Math.abs(elapsedSeconds);
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-
-  if (absoluteSeconds < 60) return formatter.format(elapsedSeconds, "second");
-  if (absoluteSeconds < 3600) return formatter.format(Math.round(elapsedSeconds / 60), "minute");
-  if (absoluteSeconds < 86400) return formatter.format(Math.round(elapsedSeconds / 3600), "hour");
-  if (absoluteSeconds < 604800) return formatter.format(Math.round(elapsedSeconds / 86400), "day");
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (summary.total > 0 && summary.done === summary.total) return { tone: "done", label: "All done" };
+  return null;
 }
 
 function getPropertyMarker(name) {
-  return name.match(/\d+/)?.[0] || name.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+  return name.match(/^\d+(?:\/\d+)*/)?.[0]
+    || name.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
 }

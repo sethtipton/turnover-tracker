@@ -1,4 +1,5 @@
-import { Info, Plus } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, CirclePlus, Info, Plus } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -103,65 +104,82 @@ export function FiltersBar({ query, statusFilter, onQueryChange, onStatusChange 
 }
 
 export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <section className="panel add-panel" aria-labelledby="add-work-title">
-      <div>
-        <h2 id="add-work-title">Add Work</h2>
+    <section className={`panel add-panel ${isOpen ? "is-open" : ""}`} aria-labelledby="add-work-title">
+      <h2 id="add-work-title">
+        <button
+          className="add-work-toggle"
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls="add-work-content"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="add-work-toggle-label">
+            <CirclePlus size={19} aria-hidden="true" />
+            Add Work
+          </span>
+          <span className="add-work-toggle-meta">Task or material</span>
+          <ChevronDown className="add-work-toggle-icon" size={18} aria-hidden="true" />
+        </button>
+      </h2>
+      <div className="add-work-content" id="add-work-content" hidden={!isOpen}>
         <p>Create approved tasks, shopping items, or collect/bring reminders.</p>
-      </div>
-      <form className={draft.kind === "material" ? "add-form has-material-type" : "add-form"} onSubmit={onSubmit}>
-        <label className="form-field" htmlFor="new-item-kind">
-          <span>Type</span>
-          <select
-            id="new-item-kind"
-            name="kind"
-            value={draft.kind}
-            onChange={(event) => onDraftChange({ kind: event.target.value })}
-          >
-            <option value="task">Task</option>
-            <option value="material">Material</option>
-          </select>
-        </label>
-        {draft.kind === "material" && (
-          <label className="form-field" htmlFor="new-material-list">
-            <span>List</span>
+        <form className={draft.kind === "material" ? "add-form has-material-type" : "add-form"} onSubmit={onSubmit}>
+          <label className="form-field" htmlFor="new-item-kind">
+            <span>Type</span>
             <select
-              id="new-material-list"
-              name="materialType"
-              value={draft.material_type}
-              onChange={(event) => onDraftChange({ material_type: event.target.value })}
+              id="new-item-kind"
+              name="kind"
+              value={draft.kind}
+              onChange={(event) => onDraftChange({ kind: event.target.value })}
             >
-              <option value="shopping">Shopping List</option>
-              <option value="collect">Collect / Bring</option>
+              <option value="task">Task</option>
+              <option value="material">Material</option>
             </select>
           </label>
-        )}
-        <label className="form-field" htmlFor="new-item-title">
-          <span>Item</span>
-          <input
-            id="new-item-title"
-            name="title"
-            value={draft.title}
-            onChange={(event) => onDraftChange({ title: event.target.value })}
-            placeholder="What needs to be done?"
-            enterKeyHint="done"
-            maxLength="140"
-            required
-          />
-        </label>
-        <label className="form-field" htmlFor="new-item-note">
-          <span>Note <span className="optional-label">optional</span></span>
-          <input
-            id="new-item-note"
-            name="note"
-            value={draft.note}
-            onChange={(event) => onDraftChange({ note: event.target.value })}
-            placeholder="Add useful details"
-            maxLength="500"
-          />
-        </label>
-        <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> Add</button>
-      </form>
+          {draft.kind === "material" && (
+            <label className="form-field" htmlFor="new-material-list">
+              <span>List</span>
+              <select
+                id="new-material-list"
+                name="materialType"
+                value={draft.material_type}
+                onChange={(event) => onDraftChange({ material_type: event.target.value })}
+              >
+                <option value="shopping">Shopping List</option>
+                <option value="collect">Collect / Bring</option>
+              </select>
+            </label>
+          )}
+          <label className="form-field" htmlFor="new-item-title">
+            <span>Item</span>
+            <input
+              id="new-item-title"
+              name="title"
+              value={draft.title}
+              onChange={(event) => onDraftChange({ title: event.target.value })}
+              placeholder="What needs to be done?"
+              enterKeyHint="done"
+              maxLength="140"
+              required
+            />
+          </label>
+          <label className="form-field" htmlFor="new-item-note">
+            <span>Note <span className="optional-label">optional</span></span>
+            <input
+              id="new-item-note"
+              name="note"
+              value={draft.note}
+              onChange={(event) => onDraftChange({ note: event.target.value })}
+              placeholder="Add useful details"
+              maxLength="500"
+            />
+          </label>
+          <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> Add</button>
+        </form>
+      </div>
     </section>
   );
 }

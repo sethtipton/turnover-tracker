@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { Check, CheckCircle2, ChevronDown, Paperclip, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Paperclip, Pencil, Trash2 } from "lucide-react";
 import { STATUS_LABELS } from "../lib/seed";
 
 export function ItemColumn({
@@ -164,8 +164,8 @@ export function EditableItem({ item, onSave, showEditLabel = false }) {
 
   if (!isEditing) {
     return (
-      <div className="item-summary">
-        <div className="item-title-row">
+      <div className={`item-summary ${showEditLabel ? "has-labeled-edit" : ""}`}>
+        <div className={`item-title-row ${showEditLabel ? "has-labeled-edit" : ""}`}>
           <h3>{item.title}</h3>
           <button
             className={showEditLabel ? "ghost edit-item-button" : "icon-button edit-title-button"}
@@ -177,12 +177,6 @@ export function EditableItem({ item, onSave, showEditLabel = false }) {
             {showEditLabel && <span>Edit</span>}
           </button>
         </div>
-        {item.status === "done" && (
-          <span className="item-completion-label">
-            <CheckCircle2 size={15} aria-hidden="true" />
-            Done
-          </span>
-        )}
         {item.note && <p>{item.note}</p>}
       </div>
     );
