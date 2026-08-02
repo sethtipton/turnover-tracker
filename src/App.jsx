@@ -613,7 +613,7 @@ function getUnitIdFromCurrentPath(units) {
 }
 
 function updateUnitPath(unit) {
-  const nextPath = unit ? `${basePath}${encodeURIComponent(getUnitSlug(unit))}` : basePath;
+  const nextPath = unit ? `${basePath}${encodeURIComponent(getUnitSlug(unit))}/` : basePath;
   const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (currentPath === nextPath) return;
   window.history.pushState({}, "", nextPath);
