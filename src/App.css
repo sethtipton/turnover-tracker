@@ -15,7 +15,7 @@
     padding-block: 1rem 2.5rem;
   }
 
-  :where(.app-header, .scope-select-bar, .summary-grid, .control-bar, .work-grid, .panel, .message) {
+  :where(.app-header, .scope-select-bar, .summary-grid, .control-bar, .work-grid, .panel, .message, .portfolio-home) {
     width: var(--content-width);
     margin-inline: auto;
   }
@@ -263,6 +263,387 @@
   .metric-review { --metric-color: var(--color-review); }
   .metric-done { --metric-color: var(--color-success); }
   .metric-shopping { --metric-color: var(--color-info); }
+
+  /* Portfolio home */
+  .portfolio-home {
+    display: grid;
+    gap: 1.25rem;
+    padding-block: 0.75rem 2rem;
+  }
+
+  .portfolio-intro,
+  .directory-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+
+    & > div {
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    & h2 {
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+
+    & p:not(.eyebrow) {
+      max-width: 42rem;
+      color: var(--color-text-muted);
+    }
+  }
+
+  .portfolio-count {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .portfolio-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border-block: 1px solid var(--color-border);
+    background: var(--color-canvas);
+  }
+
+  .portfolio-metric {
+    --portfolio-metric-color: var(--color-primary);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+    border-inline-start: 3px solid var(--portfolio-metric-color);
+
+    & + & {
+      border-block-start: 0;
+      border-inline-start-width: 1px;
+      border-inline-start-color: var(--color-border);
+    }
+
+    & dt {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    & dd {
+      margin: 0;
+      color: var(--portfolio-metric-color);
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+  }
+
+  .portfolio-metric-review { --portfolio-metric-color: var(--color-review); }
+  .portfolio-metric-shopping { --portfolio-metric-color: var(--color-info); }
+
+  .portfolio-continue {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+    overflow: clip;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .continue-content {
+    display: grid;
+    align-content: center;
+    gap: 0.875rem;
+    min-width: 0;
+    padding: 1.25rem;
+
+    & h2 {
+      font-size: 2rem;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .continue-scope {
+    color: var(--color-primary-hover);
+    font-weight: 800;
+  }
+
+  .continue-activity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .continue-progress,
+  .property-progress-row {
+    display: grid;
+    gap: 0.375rem;
+
+    & > span {
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+  }
+
+  :where(.continue-progress, .property-progress-row) progress {
+    width: 100%;
+    height: 0.4rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 999px;
+    appearance: none;
+    background: var(--color-field);
+    color: var(--property-accent, var(--color-primary));
+
+    &::-webkit-progress-bar {
+      border-radius: inherit;
+      background: var(--color-field);
+    }
+
+    &::-webkit-progress-value {
+      border-radius: inherit;
+      background: var(--property-accent, var(--color-primary));
+    }
+
+    &::-moz-progress-bar {
+      border-radius: inherit;
+      background: var(--property-accent, var(--color-primary));
+    }
+  }
+
+  .continue-counts,
+  .property-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+
+    & span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+  }
+
+  .continue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    padding-block-start: 0.25rem;
+  }
+
+  :where(.primary-link, .secondary-link) {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .primary-link {
+    background: var(--color-primary);
+    color: var(--color-on-action);
+
+    &:hover { background: var(--color-primary-hover); }
+  }
+
+  .secondary-link {
+    border-color: var(--color-control-border);
+    color: var(--color-text);
+
+    &:hover { background: var(--color-surface-raised); }
+  }
+
+  .property-directory {
+    display: grid;
+    gap: 0.875rem;
+    padding-block-start: 0.5rem;
+  }
+
+  .directory-heading {
+    align-items: end;
+
+    & h2 { font-size: 1.4rem; }
+    & > p { font-size: 0.9rem; }
+  }
+
+  .property-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+    gap: 0.75rem;
+    list-style: none;
+
+    & > li { min-width: 0; }
+  }
+
+  .property-card {
+    --property-accent: var(--color-primary);
+    display: grid;
+    grid-template-rows: 10rem minmax(0, 1fr);
+    height: 100%;
+    overflow: clip;
+    border: 1px solid var(--color-border);
+    border-block-start: 3px solid var(--property-accent);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    transition: border-color 160ms ease, translate 160ms ease;
+
+    &:hover {
+      border-color: var(--property-accent);
+      translate: 0 -2px;
+    }
+  }
+
+  .property-accent-1 { --property-accent: var(--color-info); }
+  .property-accent-2 { --property-accent: var(--color-review); }
+  .property-accent-3 { --property-accent: var(--color-danger); }
+
+  .property-visual {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-block-end: 1px solid var(--color-border);
+    background: color-mix(in oklab, var(--property-accent, var(--color-primary)) 9%, var(--color-field));
+
+    & img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .portfolio-continue .property-visual {
+    min-height: 18rem;
+    border-block-end: 0;
+    border-inline-end: 1px solid var(--color-border);
+  }
+
+  .property-visual-fallback {
+    display: grid;
+    height: 100%;
+    min-height: inherit;
+    place-content: center;
+    justify-items: center;
+    gap: 0.375rem;
+    color: var(--property-accent, var(--color-primary));
+
+    & strong {
+      font-size: 3.75rem;
+      line-height: 0.95;
+    }
+  }
+
+  .property-card-body {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.875rem;
+  }
+
+  .property-card-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.625rem;
+
+    & h3 {
+      font-size: 1.15rem;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .property-state {
+    display: inline-flex;
+    min-height: 1.75rem;
+    align-items: center;
+    gap: 0.25rem;
+    padding-inline: 0.45rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .property-state-review {
+    border-color: var(--color-review);
+    color: var(--color-review);
+  }
+
+  .property-state-open { color: var(--property-accent); }
+  .property-state-done {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+
+  .property-latest {
+    min-height: 2.5em;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+
+  .property-scopes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 0.375rem;
+    margin-block-start: auto;
+
+    & a {
+      display: inline-flex;
+      min-height: 2.75rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 0.625rem;
+      border: 1px solid var(--color-control-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-align: center;
+      text-decoration: none;
+
+      &:hover {
+        border-color: var(--property-accent);
+        background: var(--color-surface-raised);
+        color: var(--property-accent);
+      }
+    }
+  }
+
+  .portfolio-empty {
+    min-height: 18rem;
+    place-content: center;
+    justify-items: center;
+    text-align: center;
+
+    & p:not(.eyebrow) { color: var(--color-text-muted); }
+  }
 
   .control-bar {
     display: grid;
@@ -802,6 +1183,45 @@
   }
 
   @media (max-width: 52rem) {
+    :where(.portfolio-intro, .directory-heading) {
+      display: grid;
+      align-items: start;
+    }
+
+    .portfolio-count {
+      justify-self: start;
+    }
+
+    .portfolio-metric {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.125rem;
+      padding: 0.625rem;
+    }
+
+    .portfolio-continue .property-visual {
+      min-height: 6rem;
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--color-border);
+    }
+
+    .portfolio-continue .property-visual-fallback {
+      grid-auto-flow: column;
+      align-items: center;
+      gap: 1rem;
+
+      & strong { font-size: 3rem; }
+    }
+
+    .continue-content {
+      padding: 1rem;
+
+      & h2 { font-size: 1.65rem; }
+    }
+
+    .continue-actions .primary-link {
+      width: 100%;
+    }
+
     .summary-grid {
       gap: 0.375rem;
       margin-block: 0.625rem;

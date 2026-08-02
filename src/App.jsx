@@ -5,10 +5,10 @@ import { ActivityLog } from "./components/ActivityLog";
 import { AppHeader } from "./components/AppHeader";
 import { ItemColumn } from "./components/ItemColumn";
 import { AccessGate, LandingPage } from "./components/LandingPage";
+import { PortfolioHome } from "./components/PortfolioHome";
 import { ReviewQueue } from "./components/ReviewQueue";
 import {
   DictationInbox,
-  EmptyScopePanel,
   FiltersBar,
   QuickAddPanel,
   ScopeSelector,
@@ -16,6 +16,7 @@ import {
   SummaryGrid,
 } from "./components/WorkspacePanels";
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
+import { usePortfolioOverview } from "./hooks/usePortfolioOverview";
 import { useScopeItems } from "./hooks/useScopeItems";
 import { draftTasksFromDictation } from "./lib/ai";
 import {
@@ -85,6 +86,16 @@ function App() {
     workspaceId: workspace?.id,
     propertyId: selectedPropertyId,
     unitId: selectedUnitId,
+    onMessage: setMessage,
+  });
+
+  const {
+    items: portfolioItems,
+    activityLog: portfolioActivity,
+    busy: portfolioBusy,
+  } = usePortfolioOverview({
+    workspaceId: workspace?.id,
+    enabled: Boolean(workspace?.id && !selectedPropertyId),
     onMessage: setMessage,
   });
 
@@ -203,18 +214,21 @@ function App() {
   const recordingItems = activeItems.filter((item) => item.kind === "dictation");
 
   function handlePropertyChange(propertyId) {
-    const property = properties.find((candidate) => candidate.id === propertyId) || null;
-    setSelectedPropertyId(propertyId);
-    setSelectedUnitId("");
-    updateScopePath(property, null);
+    handleOpenScope(propertyId, "");
   }
 
   function handleUnitChange(unitId) {
+    handleOpenScope(selectedPropertyId, unitId);
+  }
+
+  function handleOpenScope(propertyId, unitId = "") {
+    const property = properties.find((candidate) => candidate.id === propertyId) || null;
     const unit = units.find((candidate) => (
-      candidate.id === unitId && candidate.property_id === selectedPropertyId
+      candidate.id === unitId && candidate.property_id === propertyId
     )) || null;
-    setSelectedUnitId(unitId);
-    updateScopePath(selectedProperty, unit);
+    setSelectedPropertyId(property?.id || "");
+    setSelectedUnitId(unit?.id || "");
+    updateScopePath(property, unit);
   }
 
   async function handleAddItem(event) {
@@ -318,7 +332,7 @@ function App() {
             onStopDictation={stopDictation}
             onSignOut={signOut}
           />
-          {!workMode && (
+          {!workMode && selectedProperty && (
             <ScopeSelector
               properties={properties}
               units={units}
@@ -330,7 +344,22 @@ function App() {
           )}
         </div>
 
-        {selectedProperty ? <SummaryGrid items={items} /> : <EmptyScopePanel />}
+        {selectedProperty ? (
+          <SummaryGrid items={items} />
+        ) : (
+          <>
+            <PortfolioHome
+              workspaceName={workspace?.name || "Tipton Rentals"}
+              properties={properties}
+              units={units}
+              items={portfolioItems}
+              activityLog={portfolioActivity}
+              busy={!workspace || portfolioBusy}
+              onOpenScope={handleOpenScope}
+            />
+            <StatusMessage message={message} />
+          </>
+        )}
 
         {!workMode && selectedProperty && (
           <>

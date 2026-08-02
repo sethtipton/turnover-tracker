@@ -54,15 +54,19 @@ function getUnitRouteSlugs(unitName) {
 }
 
 export function updateScopePath(property, unit, { replace = false } = {}) {
-  const segments = property
-    ? [getSlug(property.name), unit ? getSlug(unit.name) : null].filter(Boolean)
-    : [];
-  const nextPath = segments.length > 0
-    ? `${basePath}${segments.map(encodeURIComponent).join("/")}/`
-    : basePath;
+  const nextPath = getScopePath(property, unit);
 
   if (window.location.pathname === nextPath) return;
   window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath);
+}
+
+export function getScopePath(property, unit) {
+  const segments = property
+    ? [getSlug(property.name), unit ? getSlug(unit.name) : null].filter(Boolean)
+    : [];
+  return segments.length > 0
+    ? `${basePath}${segments.map(encodeURIComponent).join("/")}/`
+    : basePath;
 }
 
 function getCurrentRouteParts() {

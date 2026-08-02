@@ -66,6 +66,28 @@ export async function loadProperties(workspaceId) {
   return data || [];
 }
 
+export async function loadPortfolioOverview(workspaceId) {
+  const [itemsResult, activityResult] = await Promise.all([
+    supabase
+      .from("items")
+      .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("activity_log")
+      .select("id,property_id,unit_id,action,label,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(250),
+  ]);
+
+  if (itemsResult.error) throw itemsResult.error;
+  if (activityResult.error) throw activityResult.error;
+  return {
+    items: itemsResult.data || [],
+    activityLog: activityResult.data || [],
+  };
+}
+
 export async function loadItems({ propertyId, unitId }) {
   let query = supabase
     .from("items")
@@ -106,6 +128,21 @@ export function watchScopeData({ propertyId, unitId }, callback) {
     .channel(`scope-${scopeKey}-${crypto.randomUUID()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, callback)
     .on("postgres_changes", { event: "*", schema: "public", table: "attachments", filter }, callback)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter }, callback)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+export function watchPortfolioData(workspaceId, callback) {
+  if (!supabase || !workspaceId) return () => {};
+
+  const filter = `workspace_id=eq.${workspaceId}`;
+  const channel = supabase
+    .channel(`portfolio-${workspaceId}-${crypto.randomUUID()}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, callback)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter }, callback)
     .subscribe();
 
