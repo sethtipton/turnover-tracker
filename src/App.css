@@ -509,6 +509,12 @@
   width: 100%;
 }
 
+.recording-card p {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 @media (max-width: 900px) {
   .hero-section,
   .app-header,

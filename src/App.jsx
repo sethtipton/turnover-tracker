@@ -34,6 +34,13 @@ import {
 import { ALLOWED_EMAILS, MATERIAL_LABELS, STATUS_LABELS } from "./lib/seed";
 import { isSupabaseConfigured } from "./lib/supabase";
 
+const AUDIO_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/aac",
+];
+
 const emptyDraft = {
   title: "",
   note: "",
@@ -270,22 +277,46 @@ function App() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      const mimeType = getSupportedAudioMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const startedAt = Date.now();
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const file = new File([blob], `dictation-${Date.now()}.webm`, { type: blob.type });
-        setRecordings((current) => [{ id: crypto.randomUUID(), file, url: URL.createObjectURL(blob), unitId: selectedUnitId }, ...current]);
+        const durationMs = Date.now() - startedAt;
         stream.getTracks().forEach((track) => track.stop());
         setDictationState("idle");
-        setMessage("Dictation saved locally for now. AI task creation will be wired after auth, database, and storage are stable.");
+        mediaRecorderRef.current = null;
+
+        if (blob.size < 512) {
+          setMessage("Recording was empty. Check microphone permission and try again.");
+          return;
+        }
+
+        const extension = getAudioExtension(blob.type);
+        const file = new File([blob], `dictation-${Date.now()}.${extension}`, { type: blob.type });
+        setRecordings((current) => [{
+          id: crypto.randomUUID(),
+          file,
+          url: URL.createObjectURL(blob),
+          unitId: selectedUnitId,
+          durationMs,
+          size: blob.size,
+          mimeType: blob.type,
+        }, ...current]);
+        setMessage("Recording ready. Play it back before saving if you want to confirm audio.");
       };
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorder.start(1000);
       setDictationState("recording");
       setMessage("");
     } catch (error) {
@@ -295,7 +326,10 @@ function App() {
   }
 
   async function stopDictation() {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.requestData();
+      mediaRecorderRef.current.stop();
+    }
   }
 
   async function saveRecording(recording) {
@@ -431,6 +465,10 @@ function App() {
             {recordings.map((recording) => (
               <article className="recording-card" key={recording.id}>
                 <audio controls src={recording.url} />
+                <p>
+                  {formatDuration(recording.durationMs)} / {formatBytes(recording.size)}
+                  {recording.mimeType ? ` / ${recording.mimeType}` : ""}
+                </p>
                 <div className="recording-actions">
                   <button type="button" onClick={() => saveRecording(recording)}>Save to {selectedUnit?.name}</button>
                   <button className="ghost" type="button" onClick={() => setRecordings((current) => current.filter((item) => item.id !== recording.id))}>Delete</button>
@@ -486,6 +524,31 @@ function getAttachmentKind(file, fallback = "file") {
   if (file.type.startsWith("image/")) return "photo";
   if (file.type.startsWith("audio/")) return "audio";
   return fallback;
+}
+
+function getSupportedAudioMimeType() {
+  return AUDIO_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+}
+
+function getAudioExtension(mimeType) {
+  if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("aac")) return "aac";
+  if (mimeType.includes("mpeg")) return "mp3";
+  if (mimeType.includes("wav")) return "wav";
+  return "webm";
+}
+
+function formatDuration(durationMs = 0) {
+  const seconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function formatBytes(bytes = 0) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function LandingPage({ onSignIn, setupMissing = false }) {

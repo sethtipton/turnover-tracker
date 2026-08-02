@@ -10,7 +10,23 @@ const allowedEmails = new Set([
   "threeoakllc@gmail.com",
 ]);
 
-const materialLabels: Record<string, string> = {
+type TaskDraftItem = {
+  title: string;
+  note: string;
+  kind: "task";
+  material_type: "none";
+};
+
+type MaterialDraftItem = {
+  title: string;
+  note: string;
+  kind: "material";
+  material_type: "shopping" | "collect";
+};
+
+type DraftItem = TaskDraftItem | MaterialDraftItem;
+
+const materialLabels: Record<"shopping" | "collect", string> = {
   shopping: "Shopping List",
   collect: "Collect / Bring",
 };
@@ -99,12 +115,12 @@ export default {
         fileName: attachment.file_name,
         audioBlob,
       });
-      const draftedItems = await draftItems({
+      const draftedItems = ensureDraftItems(await draftItems({
         apiKey: openAiApiKey,
         model: openAiModel,
         unitName: unit.name,
         transcript,
-      });
+      }), transcript);
 
       const { data: currentLastItem } = await supabase
         .from("items")
@@ -120,7 +136,7 @@ export default {
         unit_id: unitId,
         title: item.title,
         note: item.note || "",
-        category: item.kind === "material" ? materialLabels[item.material_type] : "Task",
+        category: getDraftCategory(item),
         kind: item.kind,
         material_type: item.kind === "material" ? item.material_type : null,
         status: "pending-review",
@@ -202,7 +218,7 @@ async function draftItems({ apiKey, model, unitName, transcript }: {
         {
           role: "system",
           content:
-            "You convert rental turnover voice notes into concise draft work items. Create only actionable tasks or materials explicitly supported by the transcript. Use kind='material' for things to buy or bring. Use material_type='shopping' for items to buy and 'collect' for owned tools/materials to bring. Use kind='task' and material_type='none' for work to perform.",
+            "You convert casual rental turnover voice notes into concise draft work items. Create practical pending-review tasks or materials from implied repair, cleaning, buying, bringing, checking, or follow-up needs. Use kind='material' for things to buy or bring. Use material_type='shopping' for items to buy and 'collect' for owned tools/materials to bring. Use kind='task' and material_type='none' for work to perform. If the transcript is unclear but non-empty, create one task titled 'Review dictated update' with the transcript summarized in the note.",
         },
         {
           role: "user",
@@ -269,16 +285,47 @@ function getOutputText(responseBody: Record<string, unknown>) {
   return text;
 }
 
-function sanitizeDraftItems(items: Array<Record<string, unknown>>) {
+function sanitizeDraftItems(items: Array<Record<string, unknown>>): DraftItem[] {
   return items
-    .map((item) => ({
-      title: typeof item.title === "string" ? item.title.trim() : "",
-      note: typeof item.note === "string" ? item.note.trim() : "",
-      kind: item.kind === "material" ? "material" : "task",
-      material_type: item.material_type === "collect" ? "collect" : "shopping",
-    }))
-    .map((item) => item.kind === "task" ? { ...item, material_type: "none" } : item)
+    .map((item): DraftItem => {
+      const title = typeof item.title === "string" ? item.title.trim() : "";
+      const note = typeof item.note === "string" ? item.note.trim() : "";
+      if (item.kind === "material") {
+        return {
+          title,
+          note,
+          kind: "material",
+          material_type: item.material_type === "collect" ? "collect" : "shopping",
+        };
+      }
+
+      return {
+        title,
+        note,
+        kind: "task",
+        material_type: "none",
+      };
+    })
     .filter((item) => item.title.length > 0);
+}
+
+function ensureDraftItems(items: DraftItem[], transcript: string): DraftItem[] {
+  if (items.length > 0) return items;
+
+  return [{
+    title: "Review dictated update",
+    note: transcript.slice(0, 500),
+    kind: "task",
+    material_type: "none",
+  }];
+}
+
+function getDraftCategory(item: DraftItem) {
+  if (item.kind === "material") {
+    return materialLabels[item.material_type];
+  }
+
+  return "Task";
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
