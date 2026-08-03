@@ -6,6 +6,7 @@ import { ActivityLog } from "./components/ActivityLog";
 import { AppHeader } from "./components/AppHeader";
 import { ItemColumn } from "./components/ItemColumn";
 import { AccessGate, LandingPage } from "./components/LandingPage";
+import { PeopleAccess } from "./components/PeopleAccess";
 import { PortfolioHome } from "./components/PortfolioHome";
 import { ReviewQueue } from "./components/ReviewQueue";
 import {
@@ -24,9 +25,12 @@ import {
   addItem,
   getAttachmentUrl,
   getSession,
+  loadPropertyMembers,
   loadProperties,
   loadUnits,
   loadWorkspace,
+  loadWorkspaceMembers,
+  setPropertyMemberAccess,
   signInWithGoogle,
   signOut,
   uploadAttachment,
@@ -56,6 +60,10 @@ function App() {
   const [accessError, setAccessError] = useState("");
   const [mediaUrls, setMediaUrls] = useState({});
   const [workMode, setWorkMode] = useState(false);
+  const [peopleAccessOpen, setPeopleAccessOpen] = useState(false);
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
+  const [propertyMembers, setPropertyMembers] = useState([]);
+  const [accessBusy, setAccessBusy] = useState(false);
   const [dictationBusy, setDictationBusy] = useState(false);
 
   const {
@@ -103,6 +111,18 @@ function App() {
   const busy = itemsBusy || dictationBusy;
   const userEmail = session?.user?.email?.toLowerCase();
   const userDisplayName = getUserDisplayName(session?.user);
+  const isWorkspaceOwner = workspaceMembers.some((member) => (
+    member.email === userEmail && member.role === "owner"
+  ));
+  const ownerAccessPropertyIds = new Set(
+    isWorkspaceOwner
+      ? properties
+        .filter((property) => !propertyMembers.some((member) => (
+          member.property_id === property.id && member.email === userEmail
+        )))
+        .map((property) => property.id)
+      : [],
+  );
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId) || null;
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
   const selectedScopeTitle = selectedProperty
@@ -126,14 +146,23 @@ function App() {
       setAccessError("");
       try {
         const workspaceData = await loadWorkspace();
-        const [propertyData, unitData] = await Promise.all([
+        const [propertyData, unitData, memberData] = await Promise.all([
           loadProperties(workspaceData.id),
           loadUnits(workspaceData.id),
+          loadWorkspaceMembers(workspaceData.id),
         ]);
+        const isOwner = memberData.some((member) => (
+          member.email === session.user.email?.toLowerCase() && member.role === "owner"
+        ));
+        const propertyMemberData = isOwner
+          ? await loadPropertyMembers(workspaceData.id)
+          : [];
         const routeScope = getScopeFromCurrentPath(propertyData, unitData);
         setWorkspace(workspaceData);
         setProperties(propertyData);
         setUnits(unitData);
+        setWorkspaceMembers(memberData);
+        setPropertyMembers(propertyMemberData);
         setSelectedPropertyId(routeScope.propertyId);
         setSelectedUnitId(routeScope.unitId);
 
@@ -252,6 +281,30 @@ function App() {
     document.querySelector("#app-title")?.focus({ preventScroll: true });
   }
 
+  function handleTogglePeopleAccess() {
+    setPeopleAccessOpen((current) => !current);
+    setWorkMode(false);
+  }
+
+  async function handleSavePropertyAccess(email, propertyIds) {
+    if (!workspace) return;
+
+    setAccessBusy(true);
+    try {
+      await setPropertyMemberAccess({
+        workspaceId: workspace.id,
+        email,
+        propertyIds,
+      });
+      setPropertyMembers(await loadPropertyMembers(workspace.id));
+      setMessage(`Access for ${email} updated.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setAccessBusy(false);
+    }
+  }
+
   async function handleAddItem(event) {
     event.preventDefault();
     if (await addWork(draft)) setDraft(emptyDraft);
@@ -343,9 +396,9 @@ function App() {
       <main className={`app-shell ${workMode ? "work-mode" : ""}`} id="main-content" tabIndex="-1">
         <div className="workspace-top">
           <AppHeader
-            property={selectedProperty}
-            scopeTitle={selectedScopeTitle}
-            hasSelectedProperty={Boolean(selectedProperty)}
+            property={peopleAccessOpen ? null : selectedProperty}
+            scopeTitle={peopleAccessOpen ? "People & Access" : selectedScopeTitle}
+            hasSelectedProperty={Boolean(selectedProperty) && !peopleAccessOpen}
             workMode={workMode}
             onToggleWorkMode={() => setWorkMode((current) => !current)}
             dictationState={dictationState}
@@ -353,7 +406,10 @@ function App() {
             onStartDictation={startDictation}
             onStopDictation={stopDictation}
             onSignOut={signOut}
-            scopeSelector={!workMode && selectedProperty ? (
+            isWorkspaceOwner={isWorkspaceOwner}
+            peopleAccessOpen={peopleAccessOpen}
+            onTogglePeopleAccess={handleTogglePeopleAccess}
+            scopeSelector={!peopleAccessOpen && !workMode && selectedProperty ? (
               <ScopeSelector
                 properties={properties}
                 units={units}
@@ -366,73 +422,90 @@ function App() {
           />
         </div>
 
-        {selectedProperty ? (
-          <SummaryGrid items={items} />
+        {peopleAccessOpen ? (
+          <>
+            <PeopleAccess
+              members={workspaceMembers}
+              properties={properties}
+              propertyMembers={propertyMembers}
+              busy={accessBusy}
+              onClose={() => setPeopleAccessOpen(false)}
+              onSave={handleSavePropertyAccess}
+            />
+            <StatusMessage message={message} />
+          </>
         ) : (
           <>
-            <PortfolioHome
-              displayName={userDisplayName}
-              properties={properties}
-              units={units}
-              items={portfolioItems}
-              activityLog={portfolioActivity}
-              busy={!workspace || portfolioBusy}
-              onOpenScope={handleOpenScope}
-            />
-            <StatusMessage message={message} />
-          </>
-        )}
-
-        {!workMode && selectedProperty && (
-          <>
-            <ReviewQueue
-              items={reviewItems}
-              busy={busy}
-              onApprove={(item) => changeStatus(item, "approved")}
-              onApproveAll={() => approveAll(reviewItems)}
-              onItemChange={saveItem}
-              onReject={handleRejectItem}
-              onDeleteAttachment={handleDeleteAttachment}
-              mediaUrls={mediaUrls}
-            />
-            <FiltersBar
-              query={query}
-              statusFilter={statusFilter}
-              onQueryChange={setQuery}
-              onStatusChange={setStatusFilter}
-            />
-            <DictationInbox
-              recordings={selectedScopeRecordings}
-              scopeName={selectedScopeTitle}
-              onSave={saveRecording}
-              onDelete={removeRecording}
-            />
-            <QuickAddPanel
-              draft={draft}
-              busy={busy}
-              onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-              onSubmit={handleAddItem}
-            />
-            <StatusMessage message={message} />
-          </>
-        )}
-
-        {selectedProperty && (
-          <div className="work-grid">
-            {!workMode && (
-              <div className="materials-row">
-                <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-                <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-              </div>
-            )}
-            <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
-            {!workMode && (
+            {selectedProperty ? (
+              <SummaryGrid items={items} />
+            ) : (
               <>
-                <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-                <ActivityLog entries={activityLog} />
+                <PortfolioHome
+                  displayName={userDisplayName}
+                  properties={properties}
+                  units={units}
+                  items={portfolioItems}
+                  activityLog={portfolioActivity}
+                  busy={!workspace || portfolioBusy}
+                  ownerAccessPropertyIds={ownerAccessPropertyIds}
+                  onOpenScope={handleOpenScope}
+                />
+                <StatusMessage message={message} />
               </>
             )}
-          </div>
+
+            {!workMode && selectedProperty && (
+              <>
+                <ReviewQueue
+                  items={reviewItems}
+                  busy={busy}
+                  onApprove={(item) => changeStatus(item, "approved")}
+                  onApproveAll={() => approveAll(reviewItems)}
+                  onItemChange={saveItem}
+                  onReject={handleRejectItem}
+                  onDeleteAttachment={handleDeleteAttachment}
+                  mediaUrls={mediaUrls}
+                />
+                <FiltersBar
+                  query={query}
+                  statusFilter={statusFilter}
+                  onQueryChange={setQuery}
+                  onStatusChange={setStatusFilter}
+                />
+                <DictationInbox
+                  recordings={selectedScopeRecordings}
+                  scopeName={selectedScopeTitle}
+                  onSave={saveRecording}
+                  onDelete={removeRecording}
+                />
+                <QuickAddPanel
+                  draft={draft}
+                  busy={busy}
+                  onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+                  onSubmit={handleAddItem}
+                />
+                <StatusMessage message={message} />
+              </>
+            )}
+
+            {selectedProperty && (
+              <div className="work-grid">
+                {!workMode && (
+                  <div className="materials-row">
+                    <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+                    <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+                  </div>
+                )}
+                <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
+                {!workMode && (
+                  <>
+                    <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+                    <ActivityLog entries={activityLog} />
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
     </>

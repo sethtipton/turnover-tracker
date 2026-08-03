@@ -66,6 +66,37 @@ export async function loadProperties(workspaceId) {
   return data || [];
 }
 
+export async function loadWorkspaceMembers(workspaceId) {
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("id,email,role")
+    .eq("workspace_id", workspaceId)
+    .order("email", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function loadPropertyMembers(workspaceId) {
+  const { data, error } = await supabase
+    .from("property_members")
+    .select("property_id,email,role")
+    .eq("workspace_id", workspaceId);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setPropertyMemberAccess({ workspaceId, email, propertyIds }) {
+  const { error } = await supabase.rpc("set_property_member_access", {
+    target_workspace_id: workspaceId,
+    target_email: email,
+    target_property_ids: propertyIds,
+  });
+
+  if (error) throw error;
+}
+
 export async function loadPortfolioOverview(workspaceId) {
   const [itemsResult, activityResult] = await Promise.all([
     supabase

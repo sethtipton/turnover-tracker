@@ -1,4 +1,4 @@
-import { LogOut, Mic, Wrench } from "lucide-react";
+import { LogOut, Mic, UsersRound, Wrench } from "lucide-react";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -16,6 +16,9 @@ export function AppHeader({
   onStartDictation,
   onStopDictation,
   onSignOut,
+  isWorkspaceOwner,
+  peopleAccessOpen,
+  onTogglePeopleAccess,
   scopeSelector,
 }) {
   const isRecording = dictationState === "recording";
@@ -46,6 +49,17 @@ export function AppHeader({
         </h1>
       </div>
       <div className="header-actions" aria-label="Workspace actions">
+        {isWorkspaceOwner && !workMode && !hasSelectedProperty && (
+          <button
+            className={peopleAccessOpen ? "people-access-button active" : "people-access-button"}
+            type="button"
+            onClick={onTogglePeopleAccess}
+            aria-pressed={peopleAccessOpen}
+          >
+            <UsersRound size={18} aria-hidden="true" />
+            <span className="action-label">People &amp; Access</span>
+          </button>
+        )}
         {!workMode && hasSelectedProperty && (
           <div className="dictation-control">
             <button

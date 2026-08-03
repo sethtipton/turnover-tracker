@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   ClipboardCheck,
+  ShieldCheck,
   ShoppingCart,
 } from "lucide-react";
 import {
@@ -21,6 +22,7 @@ export function PortfolioHome({
   items,
   activityLog,
   busy,
+  ownerAccessPropertyIds,
   onOpenScope,
 }) {
   const overview = useMemo(
@@ -72,6 +74,7 @@ export function PortfolioHome({
               <PropertyCard
                 summary={summary}
                 busy={busy}
+                isOwnerAccess={ownerAccessPropertyIds.has(summary.property.id)}
                 onOpenScope={onOpenScope}
               />
             </li>
@@ -134,12 +137,12 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
   );
 }
 
-function PropertyCard({ summary, busy, onOpenScope }) {
+function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
   const { property, scopes, done, total, open, shopping } = summary;
   const status = getPropertyStatus(summary, busy);
 
   return (
-    <article className="property-card">
+    <article className={isOwnerAccess ? "property-card owner-access" : "property-card"}>
       <PropertyVisual
         property={property}
         transitionName={getPropertyImageTransitionName(property.id)}
@@ -149,7 +152,11 @@ function PropertyCard({ summary, busy, onOpenScope }) {
           <h3 style={{ viewTransitionName: getPropertyTitleTransitionName(property.id) }}>
             {property.name}
           </h3>
-          {status && (
+          {isOwnerAccess ? (
+            <span className="property-owner-access" aria-label="Available through workspace owner access">
+              <ShieldCheck size={14} aria-hidden="true" /> Admin access
+            </span>
+          ) : status && (
             <span className={`property-state property-state-${status.tone}`}>
               {status.tone === "done" && <CheckCircle2 size={14} aria-hidden="true" />}
               {status.tone === "review" && <AlertCircle size={14} aria-hidden="true" />}
