@@ -8,6 +8,7 @@ import { ItemColumn } from "./components/ItemColumn";
 import { AccessGate, LandingPage } from "./components/LandingPage";
 import { PeopleAccess } from "./components/PeopleAccess";
 import { PortfolioHome } from "./components/PortfolioHome";
+import { ListingViewSwitch, ListingWorkspace, PublicSite } from "./components/PublicListings";
 import { ReviewQueue } from "./components/ReviewQueue";
 import {
   DictationInbox,
@@ -26,6 +27,7 @@ import {
   getAttachmentUrl,
   getSession,
   loadPropertyMembers,
+  loadPublicListings,
   loadProperties,
   loadUnits,
   loadWorkspace,
@@ -33,6 +35,8 @@ import {
   setPropertyMemberAccess,
   signInWithGoogle,
   signOut,
+  updateProperty,
+  updateUnit,
   uploadAttachment,
   watchAuth,
 } from "./lib/data";
@@ -47,7 +51,7 @@ const emptyDraft = {
 };
 
 function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(undefined);
   const [workspace, setWorkspace] = useState(null);
   const [properties, setProperties] = useState([]);
   const [units, setUnits] = useState([]);
@@ -65,6 +69,11 @@ function App() {
   const [propertyMembers, setPropertyMembers] = useState([]);
   const [accessBusy, setAccessBusy] = useState(false);
   const [dictationBusy, setDictationBusy] = useState(false);
+  const [listingView, setListingView] = useState("tasks");
+  const [listingBusy, setListingBusy] = useState(false);
+  const [publicListings, setPublicListings] = useState([]);
+  const [publicListingsBusy, setPublicListingsBusy] = useState(false);
+  const [publicListingsError, setPublicListingsError] = useState("");
 
   const {
     state: dictationState,
@@ -108,7 +117,7 @@ function App() {
     onMessage: setMessage,
   });
 
-  const busy = itemsBusy || dictationBusy;
+  const busy = itemsBusy || dictationBusy || listingBusy;
   const userEmail = session?.user?.email?.toLowerCase();
   const userDisplayName = getUserDisplayName(session?.user);
   const isWorkspaceOwner = workspaceMembers.some((member) => (
@@ -138,6 +147,28 @@ function App() {
     getSession().then(setSession).catch((error) => setMessage(error.message));
     return watchAuth(setSession);
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || session !== null) return undefined;
+
+    let isMounted = true;
+    setPublicListingsBusy(true);
+    setPublicListingsError("");
+    loadPublicListings()
+      .then((data) => {
+        if (isMounted) setPublicListings(data);
+      })
+      .catch((error) => {
+        if (isMounted) setPublicListingsError(error.message);
+      })
+      .finally(() => {
+        if (isMounted) setPublicListingsBusy(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
@@ -198,6 +229,7 @@ function App() {
 
   useEffect(() => {
     setMediaUrls({});
+    setListingView("tasks");
     if (!selectedPropertyId) setWorkMode(false);
   }, [selectedPropertyId, selectedUnitId]);
 
@@ -305,6 +337,44 @@ function App() {
     }
   }
 
+  async function handleSaveListingProperty(patch) {
+    if (!selectedProperty) return;
+    setListingBusy(true);
+    try {
+      const updated = await updateProperty(selectedProperty.id, patch);
+      setProperties((current) => current.map((property) => (
+        property.id === updated.id ? updated : property
+      )));
+      setMessage("Property listing details saved.");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setListingBusy(false);
+    }
+  }
+
+  async function handleSaveListingUnit(unitId, patch) {
+    setListingBusy(true);
+    try {
+      const updated = await updateUnit(unitId, patch);
+      setUnits((current) => current.map((unit) => (
+        unit.id === updated.id ? updated : unit
+      )));
+      setMessage(updated.listing_published && ["available", "coming-soon"].includes(updated.listing_status)
+        ? "Listing saved and live on Tree City Rentals."
+        : "Listing saved. It is not currently public.");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setListingBusy(false);
+    }
+  }
+
+  function handleListingViewChange(nextView) {
+    setListingView(nextView);
+    if (nextView !== "tasks") setWorkMode(false);
+  }
+
   async function handleAddItem(event) {
     event.preventDefault();
     if (await addWork(draft)) setDraft(emptyDraft);
@@ -387,7 +457,8 @@ function App() {
   }
 
   if (!isSupabaseConfigured) return <LandingPage onSignIn={signInWithGoogle} setupMissing />;
-  if (!session) return <LandingPage onSignIn={signInWithGoogle} />;
+  if (session === undefined) return <PublicSite listings={[]} busy error="" onSignIn={signInWithGoogle} />;
+  if (!session) return <PublicSite listings={publicListings} busy={publicListingsBusy} error={publicListingsError} onSignIn={signInWithGoogle} />;
   if (accessError) return <AccessGate email={userEmail} onSignOut={signOut} message={accessError} />;
 
   return (
@@ -400,7 +471,10 @@ function App() {
             scopeTitle={peopleAccessOpen ? "People & Access" : selectedScopeTitle}
             hasSelectedProperty={Boolean(selectedProperty) && !peopleAccessOpen}
             workMode={workMode}
-            onToggleWorkMode={() => setWorkMode((current) => !current)}
+            onToggleWorkMode={() => {
+              setWorkMode((current) => !current);
+              setListingView("tasks");
+            }}
             dictationState={dictationState}
             audioLevel={audioLevel}
             onStartDictation={startDictation}
@@ -436,9 +510,13 @@ function App() {
           </>
         ) : (
           <>
-            {selectedProperty ? (
+            {selectedProperty && !workMode && (
+              <ListingViewSwitch view={listingView} onViewChange={handleListingViewChange} />
+            )}
+
+            {selectedProperty && (listingView === "tasks" || workMode) ? (
               <SummaryGrid items={items} />
-            ) : (
+            ) : !selectedProperty ? (
               <>
                 <PortfolioHome
                   displayName={userDisplayName}
@@ -452,9 +530,24 @@ function App() {
                 />
                 <StatusMessage message={message} />
               </>
+            ) : null}
+
+            {selectedProperty && listingView !== "tasks" && !workMode && (
+              <>
+                <ListingWorkspace
+                  property={selectedProperty}
+                  units={units}
+                  selectedUnit={selectedUnit}
+                  view={listingView}
+                  busy={listingBusy}
+                  onSaveProperty={handleSaveListingProperty}
+                  onSaveUnit={handleSaveListingUnit}
+                />
+                <StatusMessage message={message} />
+              </>
             )}
 
-            {!workMode && selectedProperty && (
+            {!workMode && selectedProperty && listingView === "tasks" && (
               <>
                 <ReviewQueue
                   items={reviewItems}
@@ -488,7 +581,7 @@ function App() {
               </>
             )}
 
-            {selectedProperty && (
+            {selectedProperty && (listingView === "tasks" || workMode) && (
               <div className="work-grid">
                 {!workMode && (
                   <div className="materials-row">

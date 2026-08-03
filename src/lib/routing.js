@@ -84,6 +84,14 @@ export function getScopeFromCurrentPath(properties, units) {
     : { propertyId: "", unitId: "" };
 }
 
+export function getPublicRouteFromCurrentPath() {
+  const routeParts = getCurrentRouteParts();
+  return {
+    propertySlug: routeParts[0] || "",
+    unitSlug: routeParts[1] || "",
+  };
+}
+
 function getUnitRouteNames(unitName) {
   return [unitName, ...(UNIT_ROUTE_ALIASES[unitName] || [])];
 }
@@ -106,6 +114,11 @@ export function getScopePath(property, unit) {
   return segments.length > 0
     ? `${basePath}${segments.map(encodeURIComponent).join("/")}/`
     : basePath;
+}
+
+export function getPublicListingPath(propertySlug, unitSlug = "") {
+  const segments = [propertySlug, unitSlug].filter(Boolean).map(encodeURIComponent);
+  return `${basePath}${segments.join("/")}/`;
 }
 
 function getCurrentRouteParts() {

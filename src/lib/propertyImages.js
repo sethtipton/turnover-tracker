@@ -22,8 +22,16 @@ const PROPERTY_IMAGES = {
   "310 Park": imageThreeTenPark,
 };
 
+const PROPERTY_IMAGES_BY_SLUG = Object.fromEntries(
+  Object.entries(PROPERTY_IMAGES).map(([propertyName, image]) => [toPropertySlug(propertyName), image]),
+);
+
 export function getPropertyImage(propertyName) {
   return PROPERTY_IMAGES[propertyName] || "";
+}
+
+export function getPropertyImageBySlug(propertySlug) {
+  return PROPERTY_IMAGES_BY_SLUG[propertySlug] || "";
 }
 
 export function getPropertyImageTransitionName(propertyId) {
@@ -36,4 +44,13 @@ export function getPropertyTitleTransitionName(propertyId) {
   if (!propertyId) return undefined;
   const safeId = String(propertyId).replace(/[^a-zA-Z0-9_-]/g, "-");
   return `property-title-${safeId}`;
+}
+
+function toPropertySlug(value) {
+  return value
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }

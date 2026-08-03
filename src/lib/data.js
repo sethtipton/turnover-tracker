@@ -66,6 +66,36 @@ export async function loadProperties(workspaceId) {
   return data || [];
 }
 
+export async function loadPublicListings() {
+  const { data, error } = await supabase.rpc("get_public_listings");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateProperty(id, patch) {
+  const { data, error } = await supabase
+    .from("properties")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateUnit(id, patch) {
+  const { data, error } = await supabase
+    .from("units")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function loadWorkspaceMembers(workspaceId) {
   const { data, error } = await supabase
     .from("workspace_members")
