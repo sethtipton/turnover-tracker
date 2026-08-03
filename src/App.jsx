@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { ClipboardList, Hammer, Mic, ShoppingCart } from "lucide-react";
 import "./App.css";
 import { ActivityLog } from "./components/ActivityLog";
+import { AppFooter } from "./components/AppFooter";
 import { AppHeader } from "./components/AppHeader";
 import { ItemColumn } from "./components/ItemColumn";
 import { AccessGate, LandingPage } from "./components/LandingPage";
@@ -484,7 +485,6 @@ function App() {
             audioLevel={audioLevel}
             onStartDictation={startDictation}
             onStopDictation={stopDictation}
-            onSignOut={signOut}
             isWorkspaceOwner={isWorkspaceOwner}
             peopleAccessOpen={peopleAccessOpen}
             onTogglePeopleAccess={handleTogglePeopleAccess}
@@ -606,6 +606,7 @@ function App() {
           </>
         )}
       </main>
+      <AppFooter authenticated onAuthAction={signOut} />
     </>
   );
 }

@@ -16,7 +16,7 @@ export function ScopeSelector({
   return (
     <section className="scope-select-bar" aria-label="Property and work scope">
       <label className="form-field" htmlFor="property-select">
-        <span>Property</span>
+        <span className="visually-hidden">Property</span>
         <select
           id="property-select"
           name="property"
@@ -30,7 +30,7 @@ export function ScopeSelector({
         </select>
       </label>
       <label className="form-field" htmlFor="scope-select">
-        <span>Scope</span>
+        <span className="visually-hidden">Scope</span>
         <select
           id="scope-select"
           name="scope"

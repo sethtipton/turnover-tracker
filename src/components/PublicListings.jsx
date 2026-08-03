@@ -15,6 +15,7 @@ import {
 import { createListingPreview } from "../lib/listings";
 import { getPropertyImageBySlug } from "../lib/propertyImages";
 import { getPublicListingPath, getPublicRouteFromCurrentPath } from "../lib/routing";
+import { AppFooter } from "./AppFooter";
 
 export function PublicSite({ listings, busy, error, onSignIn }) {
   const [route, setRoute] = useState(getPublicRouteFromCurrentPath);
@@ -39,20 +40,23 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
   }, [listing?.listing_headline, property?.property_name]);
 
   return (
-    <main className="public-site" id="main-content" tabIndex="-1">
-      <PublicHeader onSignIn={onSignIn} />
-      {error ? (
-        <section className="public-empty"><h1>Listings are unavailable</h1><p>{error}</p></section>
-      ) : busy && (isListingRoute || isPropertyRoute) ? (
-        <PublicRouteLoading listing={isListingRoute} />
-      ) : isListingRoute ? (
-        listing ? <ListingDetail listing={listing} /> : <PublicNotFound />
-      ) : isPropertyRoute ? (
-        property ? <PublicPropertyPage property={property} /> : <PublicNotFound />
-      ) : (
-        <PublicListingDirectory listings={listings} busy={busy} />
-      )}
-    </main>
+    <>
+      <main className="public-site" id="main-content" tabIndex="-1">
+        <PublicHeader />
+        {error ? (
+          <section className="public-empty"><h1>Listings are unavailable</h1><p>{error}</p></section>
+        ) : busy && (isListingRoute || isPropertyRoute) ? (
+          <PublicRouteLoading listing={isListingRoute} />
+        ) : isListingRoute ? (
+          listing ? <ListingDetail listing={listing} /> : <PublicNotFound />
+        ) : isPropertyRoute ? (
+          property ? <PublicPropertyPage property={property} /> : <PublicNotFound />
+        ) : (
+          <PublicListingDirectory listings={listings} busy={busy} />
+        )}
+      </main>
+      <AppFooter onAuthAction={onSignIn} />
+    </>
   );
 }
 
@@ -99,14 +103,13 @@ export function ListingViewSwitch({ view, onViewChange }) {
   );
 }
 
-function PublicHeader({ onSignIn }) {
+function PublicHeader() {
   return (
     <header className="public-header">
       <a className="public-brand" href={getPublicListingPath("")}>
         <Building2 size={22} aria-hidden="true" />
         <span>Tree City Rentals</span>
       </a>
-      <button className="public-sign-in" type="button" onClick={onSignIn}>Sign in</button>
     </header>
   );
 }

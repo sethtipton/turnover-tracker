@@ -1,4 +1,4 @@
-import { LogOut, Mic, UsersRound, Wrench } from "lucide-react";
+import { Mic, UsersRound, Wrench } from "lucide-react";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -15,7 +15,6 @@ export function AppHeader({
   audioLevel,
   onStartDictation,
   onStopDictation,
-  onSignOut,
   isWorkspaceOwner,
   peopleAccessOpen,
   onTogglePeopleAccess,
@@ -95,12 +94,6 @@ export function AppHeader({
           >
             <Wrench size={18} aria-hidden="true" />
             <span className="action-label">Work Mode</span>
-          </button>
-        )}
-        {!workMode && (
-          <button className="ghost sign-out-button" type="button" onClick={onSignOut} aria-label="Sign out">
-            <LogOut size={17} aria-hidden="true" />
-            <span className="action-label">Sign out</span>
           </button>
         )}
       </div>
