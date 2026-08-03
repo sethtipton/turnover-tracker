@@ -147,6 +147,35 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     }, previousItems);
   }
 
+  async function archiveItem(item) {
+    if (item.status !== "done") return false;
+
+    const archivedAt = new Date().toISOString();
+    const previousItems = items;
+    setItems((current) => current.map((candidate) => (
+      candidate.id === item.id ? { ...candidate, archived_at: archivedAt } : candidate
+    )));
+
+    return runMutation(async () => {
+      await updateItem(item.id, { archived_at: archivedAt });
+      onMessage(`${item.title} archived to Work History.`);
+      return true;
+    }, previousItems);
+  }
+
+  async function unarchiveItem(item) {
+    const previousItems = items;
+    setItems((current) => current.map((candidate) => (
+      candidate.id === item.id ? { ...candidate, archived_at: null } : candidate
+    )));
+
+    return runMutation(async () => {
+      await updateItem(item.id, { archived_at: null });
+      onMessage(`${item.title} restored to active work.`);
+      return true;
+    }, previousItems);
+  }
+
   async function uploadFiles(item, fileList, fallbackKind) {
     const files = [...fileList];
     if (files.length === 0 || !workspaceId) return false;
@@ -206,6 +235,8 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     approveAll,
     saveItem,
     removeItem,
+    archiveItem,
+    unarchiveItem,
     uploadFiles,
     removeAttachment,
   };

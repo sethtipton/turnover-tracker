@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { Check, ChevronDown, Paperclip, Pencil, Trash2 } from "lucide-react";
+import { Archive, Check, ChevronDown, Paperclip, Pencil, Trash2 } from "lucide-react";
 import { STATUS_LABELS } from "../lib/seed";
 
 export function ItemColumn({
@@ -12,6 +12,7 @@ export function ItemColumn({
   onDelete,
   onUpload,
   onDeleteAttachment,
+  onArchive,
   mediaUrls,
   forceOpen = false,
   compact = false,
@@ -55,36 +56,18 @@ export function ItemColumn({
           <p className="empty">Nothing here yet.</p>
         ) : (
           <ul className="item-list" role="list">
-            {orderedItems.map((item) => (
-              <li
-                className={`item-card status-${item.status}`}
-                key={item.id}
-                style={{ viewTransitionName: `item-${item.id}` }}
-              >
-                <div className="item-main">
-                  <EditableItem
-                    item={item}
-                    onSave={handleItemChange}
-                    onToggleCompletion={() => handleStatusChange(item, item.status === "done" ? "approved" : "done")}
-                  />
-                </div>
-                {!compact && (
-                  <ItemActions
-                    item={item}
-                    onStatus={handleStatusChange}
-                    onDelete={onDelete}
-                    onUpload={onUpload}
-                  />
-                )}
-                {!compact && (
-                  <AttachmentList
-                    attachments={item.attachments}
-                    mediaUrls={mediaUrls}
-                    onDelete={onDeleteAttachment}
-                  />
-                )}
-              </li>
-            ))}
+            {orderedItems.map((item) => <ItemCard
+              key={item.id}
+              item={item}
+              compact={compact}
+              mediaUrls={mediaUrls}
+              onItemChange={handleItemChange}
+              onStatus={handleStatusChange}
+              onDelete={onDelete}
+              onUpload={onUpload}
+              onDeleteAttachment={onDeleteAttachment}
+              onArchive={onArchive}
+            />)}
           </ul>
         )}
       </div>
@@ -92,12 +75,50 @@ export function ItemColumn({
   );
 }
 
-function ItemActions({ item, onStatus, onDelete, onUpload }) {
+function ItemCard({ item, compact, mediaUrls, onItemChange, onStatus, onDelete, onUpload, onDeleteAttachment, onArchive }) {
+  const [editRequest, setEditRequest] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+
+  return (
+    <li className={`item-card status-${item.status}`} style={{ viewTransitionName: `item-${item.id}` }}>
+      <div className="item-main">
+        <EditableItem
+          item={item}
+          editRequest={editRequest}
+          onEditingChange={setIsEditing}
+          onSave={onItemChange}
+          onUpload={onUpload}
+          onToggleCompletion={() => onStatus(item, item.status === "done" ? "approved" : "done")}
+        />
+      </div>
+      {!compact && (
+        <ItemActions
+          item={item}
+          isEditing={isEditing}
+          onEdit={() => setEditRequest((current) => current + 1)}
+          onStatus={onStatus}
+          onDelete={onDelete}
+          onArchive={onArchive}
+        />
+      )}
+      {!compact && <AttachmentList attachments={item.attachments} mediaUrls={mediaUrls} onDelete={onDeleteAttachment} />}
+    </li>
+  );
+}
+
+function ItemActions({ item, isEditing, onEdit, onStatus, onDelete, onArchive }) {
   const statusId = `item-status-${item.id}`;
-  const attachmentId = `item-attachment-${item.id}`;
 
   return (
     <div className="item-actions">
+      {!isEditing && (
+        <button className="icon-button edit-title-button" type="button" onClick={onEdit} aria-label={`Edit ${item.title}`}>
+          <Pencil size={16} aria-hidden="true" />
+        </button>
+      )}
+      <button className="icon-button danger-icon-button" type="button" onClick={() => onDelete(item)} aria-label={`Delete ${item.title}`}>
+        <Trash2 size={17} aria-hidden="true" />
+      </button>
       <label className="visually-hidden" htmlFor={statusId}>Status for {item.title}</label>
       <select
         className={`status-select status-select-${item.status}`}
@@ -110,29 +131,22 @@ function ItemActions({ item, onStatus, onDelete, onUpload }) {
           <option key={value} value={value}>{label}</option>
         ))}
       </select>
-      <label className="attach-button" htmlFor={attachmentId}>
-        <Paperclip size={15} aria-hidden="true" />
-        Attach
-        <input
-          id={attachmentId}
-          name={`attachments-${item.id}`}
-          type="file"
-          accept="image/*,audio/*"
-          multiple
-          onChange={(event) => {
-            onUpload(item, event.target.files, "file");
-            event.target.value = "";
-          }}
-        />
-      </label>
-      <button className="icon-button danger-icon-button" type="button" onClick={() => onDelete(item)} aria-label={`Delete ${item.title}`}>
-        <Trash2 size={17} aria-hidden="true" />
-      </button>
+      {item.status === "done" && (
+        <button
+          className="icon-button archive-icon-button"
+          type="button"
+          onClick={() => onArchive(item)}
+          aria-label={`Archive ${item.title}`}
+          title="Archive completed item"
+        >
+          <Archive size={16} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
 
-export function EditableItem({ item, onSave, onToggleCompletion }) {
+export function EditableItem({ item, editRequest = 0, onEditingChange, onSave, onUpload, onToggleCompletion, showInlineEdit = false }) {
   const [draft, setDraft] = useState(() => getItemEditDraft(item));
   const [isEditing, setIsEditing] = useState(false);
 
@@ -140,27 +154,40 @@ export function EditableItem({ item, onSave, onToggleCompletion }) {
     setDraft(getItemEditDraft(item));
   }, [item]);
 
+  useEffect(() => {
+    if (editRequest === 0) return;
+    setIsEditing(true);
+    onEditingChange?.(true);
+  }, [editRequest, onEditingChange]);
+
   function saveItem(event) {
     event?.preventDefault();
     const nextTitle = draft.title.trim();
     if (!nextTitle) return;
     onSave(item, { ...draft, title: nextTitle });
     setIsEditing(false);
+    onEditingChange?.(false);
   }
 
   function cancelEdit() {
     setDraft(getItemEditDraft(item));
     setIsEditing(false);
+    onEditingChange?.(false);
   }
 
   function handleKeyDown(event) {
     if (event.key === "Escape") cancelEdit();
   }
 
+  function beginEdit() {
+    setIsEditing(true);
+    onEditingChange?.(true);
+  }
+
   if (!isEditing) {
     return (
       <div className={onToggleCompletion ? "item-summary" : "item-summary without-completion"}>
-        <div className={onToggleCompletion ? "item-title-row" : "item-title-row without-completion"}>
+        <div className={`${onToggleCompletion ? "item-title-row" : "item-title-row without-completion"}${showInlineEdit ? " has-inline-edit" : ""}`}>
           {onToggleCompletion && (
             <button
               className="check-button"
@@ -172,17 +199,16 @@ export function EditableItem({ item, onSave, onToggleCompletion }) {
               <Check size={15} aria-hidden="true" />
             </button>
           )}
-          <h3>{item.title}</h3>
-          <button
-            className="icon-button edit-title-button"
-            type="button"
-            onClick={() => setIsEditing(true)}
-            aria-label={`Edit ${item.title}`}
-          >
-            <Pencil size={16} aria-hidden="true" />
-          </button>
+          <div className="item-title-content">
+            <h3>{item.title}</h3>
+            {item.note && <p>{item.note}</p>}
+          </div>
+          {showInlineEdit && (
+            <button className="icon-button edit-title-button" type="button" onClick={beginEdit} aria-label={`Edit ${item.title}`}>
+              <Pencil size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
-        {item.note && <p>{item.note}</p>}
       </div>
     );
   }
@@ -191,6 +217,7 @@ export function EditableItem({ item, onSave, onToggleCompletion }) {
   const listId = `edit-list-${item.id}`;
   const statusId = `edit-status-${item.id}`;
   const noteId = `edit-note-${item.id}`;
+  const attachmentId = `edit-attachment-${item.id}`;
 
   return (
     <form className="item-editor" onSubmit={saveItem} onKeyDown={handleKeyDown}>
@@ -233,6 +260,23 @@ export function EditableItem({ item, onSave, onToggleCompletion }) {
         <span>Note</span>
         <textarea id={noteId} name="note" value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={3} maxLength="500" />
       </label>
+      {onUpload && (
+        <label className="attach-button editor-attachment" htmlFor={attachmentId}>
+          <Paperclip size={15} aria-hidden="true" />
+          Attach files
+          <input
+            id={attachmentId}
+            name={`attachments-${item.id}`}
+            type="file"
+            accept="image/*,audio/*"
+            multiple
+            onChange={(event) => {
+              onUpload(item, event.target.files, "file");
+              event.target.value = "";
+            }}
+          />
+        </label>
+      )}
       <div className="title-edit-actions">
         <button type="submit">Save changes</button>
         <button className="ghost" type="button" onClick={cancelEdit}>Cancel</button>

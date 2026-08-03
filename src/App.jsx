@@ -98,6 +98,8 @@ function App() {
     approveAll,
     saveItem,
     removeItem,
+    archiveItem,
+    unarchiveItem,
     uploadFiles,
     removeAttachment,
   } = useScopeItems({
@@ -255,6 +257,7 @@ function App() {
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items.filter((item) => {
+      if (item.archived_at) return false;
       const matchesQuery =
         !normalizedQuery ||
         [item.title, item.note, item.category, item.kind, item.material_type]
@@ -267,10 +270,12 @@ function App() {
     });
   }, [items, query, statusFilter]);
 
-  const reviewItems = items.filter((item) => item.status === "pending-review" && item.kind !== "dictation");
+  const activeScopeItems = items.filter((item) => !item.archived_at);
+  const archivedItems = items.filter((item) => item.archived_at);
+  const reviewItems = activeScopeItems.filter((item) => item.status === "pending-review" && item.kind !== "dictation");
   const activeItems = filteredItems.filter((item) => item.status !== "pending-review");
   const taskItems = workMode
-    ? items.filter((item) => item.status === "approved" && item.kind === "task")
+    ? activeScopeItems.filter((item) => item.status === "approved" && item.kind === "task")
     : activeItems.filter((item) => item.kind === "task");
   const shoppingItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "shopping");
   const collectItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "collect");
@@ -515,7 +520,7 @@ function App() {
             )}
 
             {selectedProperty && (listingView === "tasks" || workMode) ? (
-              <SummaryGrid items={items} />
+              <SummaryGrid items={activeScopeItems} />
             ) : !selectedProperty ? (
               <>
                 <PortfolioHome
@@ -585,15 +590,15 @@ function App() {
               <div className="work-grid">
                 {!workMode && (
                   <div className="materials-row">
-                    <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-                    <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
+                    <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+                    <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
                   </div>
                 )}
-                <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
+                <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
                 {!workMode && (
                   <>
-                    <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} mediaUrls={mediaUrls} />
-                    <ActivityLog entries={activityLog} />
+                    <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+                    <ActivityLog entries={activityLog} archivedItems={archivedItems} busy={busy} onUnarchive={unarchiveItem} />
                   </>
                 )}
               </div>

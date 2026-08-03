@@ -33,7 +33,7 @@ export function ReviewQueue({
               {item.kind === "material" ? <ShoppingCart size={16} aria-hidden="true" /> : <Wrench size={16} aria-hidden="true" />}
               {getReviewItemLabel(item)}
             </div>
-            <EditableItem item={item} onSave={onItemChange} />
+            <EditableItem item={item} onSave={onItemChange} showInlineEdit />
             <AttachmentList attachments={item.attachments} mediaUrls={mediaUrls} onDelete={onDeleteAttachment} />
             <div className="review-actions">
               <button type="button" onClick={() => onApprove(item)} disabled={busy}>

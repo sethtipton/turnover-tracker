@@ -57,21 +57,25 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
 }
 
 export function ListingWorkspace({ property, units, selectedUnit, view, busy, onSaveProperty, onSaveUnit }) {
-  const listingUnits = selectedUnit ? [selectedUnit] : units.filter((unit) => unit.property_id === property.id);
-  const listings = listingUnits.map((unit) => createListingPreview(property, unit));
+  const propertyUnits = units.filter((unit) => unit.property_id === property.id);
+  const displayUnit = selectedUnit || (propertyUnits.length === 1 ? propertyUnits[0] : null);
+  const listings = propertyUnits.map((unit) => createListingPreview(property, unit));
+  const displayListing = displayUnit
+    ? listings.find((listing) => listing.unit_id === displayUnit.id)
+    : null;
 
   return (
     <section className="listing-workspace" aria-label="Public listing workspace">
       {view === "edit" ? (
         <ListingEditor
           property={property}
-          units={listingUnits}
+          units={selectedUnit ? [selectedUnit] : propertyUnits}
           busy={busy}
           onSaveProperty={onSaveProperty}
           onSaveUnit={onSaveUnit}
         />
-      ) : selectedUnit ? (
-        <ListingDetail listing={listings[0]} preview />
+      ) : displayListing ? (
+        <ListingDetail listing={displayListing} preview />
       ) : (
         <PublicPropertyPage property={groupListings(listings)[0]} preview />
       )}
@@ -234,6 +238,12 @@ function ListingCard({ listing, preview = false }) {
           </div>
           <h2>{title}</h2>
           {listing.display_address && <p><MapPin size={16} aria-hidden="true" /> {listing.display_address}</p>}
+          {(listing.neighborhood || listing.available_date) && (
+            <div className="listing-card-details">
+              {listing.neighborhood && <span><MapPin size={15} aria-hidden="true" /> {listing.neighborhood}</span>}
+              {listing.available_date && <span><CalendarDays size={15} aria-hidden="true" /> Available {formatDate(listing.available_date)}</span>}
+            </div>
+          )}
           <div className="listing-card-specs">
             {listing.bedrooms != null && <span>{formatNumber(listing.bedrooms)} bd</span>}
             {listing.full_bathrooms != null && <span>{formatNumber(listing.full_bathrooms)} ba</span>}

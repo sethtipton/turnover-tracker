@@ -52,7 +52,8 @@ create table if not exists public.items (
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  archived_at timestamptz
 );
 
 create table if not exists public.attachments (
@@ -184,7 +185,8 @@ begin
     and new.material_type is not distinct from old.material_type
     and new.sort_order is not distinct from old.sort_order
     and new.property_id is not distinct from old.property_id
-    and new.unit_id is not distinct from old.unit_id then
+    and new.unit_id is not distinct from old.unit_id
+    and new.archived_at is not distinct from old.archived_at then
     return new;
   end if;
 
@@ -206,6 +208,8 @@ begin
     activity_action := case
       when new.status = 'done' and old.status <> 'done' then 'completed'
       when old.status = 'done' and new.status <> 'done' then 'reopened'
+      when new.archived_at is not null and old.archived_at is null then 'archived'
+      when new.archived_at is null and old.archived_at is not null then 'unarchived'
       when new.status <> old.status then 'status-changed'
       else 'updated'
     end;

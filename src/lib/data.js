@@ -132,7 +132,8 @@ export async function loadPortfolioOverview(workspaceId) {
     supabase
       .from("items")
       .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at")
-      .eq("workspace_id", workspaceId),
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null),
     supabase
       .from("activity_log")
       .select("id,property_id,unit_id,action,label,created_at")
