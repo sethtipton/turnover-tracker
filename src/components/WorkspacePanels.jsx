@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, CirclePlus, Info, Plus } from "lucide-react";
+import { ChevronDown, CirclePlus, Info, Mic, Plus, Wrench } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -48,14 +48,48 @@ export function ScopeSelector({
   );
 }
 
-export function SummaryGrid({ items }) {
+export function SummaryGrid({
+  items,
+  workMode,
+  onToggleWorkMode,
+  dictationState,
+  audioLevel,
+  onStartDictation,
+  onStopDictation,
+}) {
   const pendingCount = items.filter((item) => item.status === "pending-review").length;
+  const isRecording = dictationState === "recording";
   return (
     <section className="summary-grid" aria-label="Selected scope summary">
       <Metric tone="approved" label="Approved" value={items.filter((item) => item.status === "approved").length} />
       <Metric tone="review" label="Pending Review" value={pendingCount} />
       <Metric tone="done" label="Done" value={items.filter((item) => item.status === "done").length} />
       <Metric tone="shopping" label="Shopping" value={items.filter((item) => item.material_type === "shopping").length} />
+      <div className="summary-actions" aria-label="Task actions">
+        {!workMode && (
+          <div className="dictation-control">
+            <button
+              className={isRecording ? "recording" : ""}
+              type="button"
+              onClick={isRecording ? onStopDictation : onStartDictation}
+              aria-describedby={isRecording ? "recording-status" : undefined}
+            >
+              <Mic size={18} aria-hidden="true" />
+              {isRecording ? "Stop recording" : "Dictate Tasks"}
+            </button>
+            {isRecording && (
+              <div className="audio-meter" role="progressbar" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(audioLevel * 100)}>
+                <span style={{ transform: `scaleX(${Math.max(0.04, audioLevel)})` }} />
+              </div>
+            )}
+            {isRecording && <span className="visually-hidden" id="recording-status">Recording is in progress.</span>}
+          </div>
+        )}
+        <button className={workMode ? "work-mode-button active" : "work-mode-button"} type="button" onClick={onToggleWorkMode} aria-pressed={workMode}>
+          <Wrench size={18} aria-hidden="true" />
+          Work Mode
+        </button>
+      </div>
     </section>
   );
 }

@@ -1,24 +1,32 @@
-import { Check, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getScopePath } from "../lib/routing";
 
 const PANEL_CONFIG = {
   tasks: {
-    title: "Open tasks",
+    title: "Open",
     empty: "No open tasks right now.",
     matches: (item) => item.kind === "task" && item.status === "approved",
     action: { label: "Mark done", status: "done" },
   },
   review: {
-    title: "Pending review",
+    title: "Pending",
     empty: "No tasks need review right now.",
     matches: (item) => item.kind !== "dictation" && item.status === "pending-review",
     action: { label: "Approve", status: "approved" },
   },
   shopping: {
-    title: "Shopping items",
+    title: "Shopping",
+    combinedTitle: "Shopping List for all Properties",
     empty: "No shopping items right now.",
     matches: (item) => item.kind === "material" && item.material_type === "shopping" && item.status !== "done",
+    action: { label: "Mark done", status: "done" },
+  },
+  collect: {
+    title: "Collect",
+    combinedTitle: "Collect / Bring for all Properties",
+    empty: "No collect or bring items right now.",
+    matches: (item) => item.kind === "material" && item.material_type === "collect" && item.status !== "done",
     action: { label: "Mark done", status: "done" },
   },
 };
@@ -44,7 +52,6 @@ export function PortfolioDrilldown({
     <section className={`portfolio-drilldown portfolio-drilldown-${panel}`} id="portfolio-work-drilldown" aria-labelledby="portfolio-drilldown-title">
       <div className="portfolio-drilldown-heading">
         <div>
-          <p className="eyebrow">Portfolio work</p>
           <h2 id="portfolio-drilldown-title">{config.title}</h2>
         </div>
         <span className="portfolio-drilldown-count">{busy ? "Updating" : `${count} item${count === 1 ? "" : "s"}`}</span>
@@ -53,14 +60,15 @@ export function PortfolioDrilldown({
         <p className="empty">{config.empty}</p>
       ) : (
         <>
-          {panel === "shopping" && (
-            <ShoppingRunList groups={groups} busy={busy} onItemChange={onItemChange} />
+          {config.combinedTitle && (
+            <ShoppingRunList panel={panel} title={config.combinedTitle} groups={groups} busy={busy} onItemChange={onItemChange} />
           )}
           <div className="portfolio-drilldown-groups">
             {groups.map((group) => (
               <PropertyItemGroup
                 key={group.property.id}
                 group={group}
+                collapsible={panel === "tasks" || panel === "shopping" || panel === "collect"}
                 action={config.action}
                 busy={busy}
                 onOpenScope={onOpenScope}
@@ -75,7 +83,7 @@ export function PortfolioDrilldown({
   );
 }
 
-function ShoppingRunList({ groups, busy, onItemChange }) {
+function ShoppingRunList({ panel, title, groups, busy, onItemChange }) {
   const [completingId, setCompletingId] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const entries = groups.flatMap((group) => group.items.map((entry) => ({
@@ -90,21 +98,21 @@ function ShoppingRunList({ groups, busy, onItemChange }) {
   }
 
   return (
-    <section className="shopping-run" aria-labelledby="shopping-run-title">
-      <h3 id="shopping-run-title">
+    <section className={`shopping-run shopping-run-${panel}`} aria-labelledby={`${panel}-run-title`}>
+      <h3 id={`${panel}-run-title`}>
         <button
           className="shopping-run-toggle"
           type="button"
           aria-expanded={isOpen}
-          aria-controls="shopping-run-items"
+          aria-controls={`${panel}-run-items`}
           onClick={() => setIsOpen((current) => !current)}
         >
           <ChevronDown size={17} aria-hidden="true" />
-          <span>Shopping List</span>
+          <span>{title}</span>
           <strong>{entries.length}</strong>
         </button>
       </h3>
-      <ul className="shopping-run-list" id="shopping-run-items" role="list" hidden={!isOpen}>
+      <ul className="shopping-run-list" id={`${panel}-run-items`} role="list" hidden={!isOpen}>
         {entries.map(({ item, property, unit }) => (
           <li key={item.id}>
             <label className="shopping-run-item">
@@ -127,23 +135,43 @@ function ShoppingRunList({ groups, busy, onItemChange }) {
   );
 }
 
-function PropertyItemGroup({ group, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
+function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
+  const [isOpen, setIsOpen] = useState(true);
+  const contentId = `portfolio-group-items-${group.property.id}`;
+
   return (
-    <section className="portfolio-item-group" aria-labelledby={`portfolio-group-${group.property.id}`}>
+    <section className={`portfolio-item-group${collapsible && !isOpen ? " is-collapsed" : ""}`} aria-labelledby={`portfolio-group-${group.property.id}`}>
       <div className="portfolio-item-group-heading">
-        <ScopeLink property={group.property} onOpenScope={onOpenScope}>
-          <h3 id={`portfolio-group-${group.property.id}`}>{group.property.name}</h3>
-        </ScopeLink>
+        {collapsible ? (
+          <h3 id={`portfolio-group-${group.property.id}`}>
+            <button
+              className="portfolio-item-group-heading-toggle"
+              type="button"
+              aria-expanded={isOpen}
+              aria-controls={contentId}
+              onClick={() => setIsOpen((current) => !current)}
+            >
+              <ChevronDown size={17} aria-hidden="true" />
+              {group.property.name}
+            </button>
+          </h3>
+        ) : (
+          <ScopeLink property={group.property} onOpenScope={onOpenScope}>
+            <h3 id={`portfolio-group-${group.property.id}`}>{group.property.name}</h3>
+          </ScopeLink>
+        )}
         <span>{group.items.length}</span>
       </div>
-      <ul className="portfolio-item-list" role="list">
+      <ul className="portfolio-item-list" id={contentId} role="list" hidden={collapsible && !isOpen}>
         {group.items.map(({ item, unit }) => (
           <PortfolioItemRow
             key={item.id}
             item={item}
+            property={group.property}
             unit={unit}
             action={action}
             busy={busy}
+            onOpenScope={onOpenScope}
             onItemChange={onItemChange}
             onDeleteItem={onDeleteItem}
           />
@@ -153,7 +181,7 @@ function PropertyItemGroup({ group, action, busy, onOpenScope, onItemChange, onD
   );
 }
 
-function PortfolioItemRow({ item, unit, action, busy, onItemChange, onDeleteItem }) {
+function PortfolioItemRow({ item, property, unit, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [working, setWorking] = useState(false);
@@ -188,7 +216,10 @@ function PortfolioItemRow({ item, unit, action, busy, onItemChange, onDeleteItem
 
   return (
     <li className="portfolio-item-row">
-      <span className="portfolio-item-scope">{unit?.name || "Property"}</span>
+      <ScopeLink className="portfolio-item-scope" property={property} unit={unit} onOpenScope={onOpenScope}>
+        <span>{unit?.name || "Property"}</span>
+        <ArrowRight size={15} aria-hidden="true" />
+      </ScopeLink>
       <div className="portfolio-item-copy">
         {editing ? (
           <form className="portfolio-item-rename" onSubmit={saveTitle}>
@@ -216,7 +247,7 @@ function PortfolioItemRow({ item, unit, action, busy, onItemChange, onDeleteItem
         <div className="portfolio-item-actions">
           <button className="portfolio-status-action" type="button" onClick={runAction} disabled={busy || working}>
             <Check size={15} aria-hidden="true" />
-            {action.label}
+            <span>{action.label}</span>
           </button>
           <button className="icon-button" type="button" onClick={() => setEditing(true)} disabled={busy || working} aria-label={`Rename ${item.title}`}>
             <Pencil size={16} aria-hidden="true" />
@@ -230,7 +261,7 @@ function PortfolioItemRow({ item, unit, action, busy, onItemChange, onDeleteItem
   );
 }
 
-function ScopeLink({ property, onOpenScope, children }) {
+function ScopeLink({ property, unit, onOpenScope, className, children }) {
   function handleClick(event) {
     if (
       event.defaultPrevented
@@ -242,10 +273,10 @@ function ScopeLink({ property, onOpenScope, children }) {
     ) return;
 
     event.preventDefault();
-    onOpenScope(property.id);
+    onOpenScope(property.id, unit?.id || "");
   }
 
-  return <a href={getScopePath(property)} onClick={handleClick}>{children}</a>;
+  return <a className={className} href={getScopePath(property, unit)} onClick={handleClick}>{children}</a>;
 }
 
 function getPortfolioGroups(properties, units, items, matches) {

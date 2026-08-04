@@ -1,4 +1,4 @@
-import { Mic, UsersRound, Wrench } from "lucide-react";
+import { UsersRound } from "lucide-react";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -9,24 +9,16 @@ export function AppHeader({
   property,
   scopeTitle,
   hasSelectedProperty,
-  workMode,
-  onToggleWorkMode,
-  dictationState,
-  audioLevel,
-  onStartDictation,
-  onStopDictation,
   isWorkspaceOwner,
   peopleAccessOpen,
   onTogglePeopleAccess,
   scopeSelector,
 }) {
-  const isRecording = dictationState === "recording";
   const propertyImage = getPropertyImage(property?.name);
   const headerClassName = [
     "app-header",
     propertyImage && "has-property-image",
     scopeSelector && "has-scope-selector",
-    workMode && "work-mode-active",
   ].filter(Boolean).join(" ");
 
   return (
@@ -48,8 +40,8 @@ export function AppHeader({
           {scopeTitle || "Turnover Tracker"}
         </h1>
       </div>
-      <div className="header-actions" aria-label="Workspace actions">
-        {isWorkspaceOwner && !workMode && !hasSelectedProperty && (
+      {isWorkspaceOwner && !hasSelectedProperty && (
+        <div className="header-actions" aria-label="Workspace actions">
           <button
             className={peopleAccessOpen ? "people-access-button active" : "people-access-button"}
             type="button"
@@ -59,45 +51,8 @@ export function AppHeader({
             <UsersRound size={18} aria-hidden="true" />
             <span className="action-label">People &amp; Access</span>
           </button>
-        )}
-        {!workMode && hasSelectedProperty && (
-          <div className="dictation-control">
-            <button
-              className={isRecording ? "recording" : ""}
-              type="button"
-              onClick={isRecording ? onStopDictation : onStartDictation}
-              aria-describedby={isRecording ? "recording-status" : undefined}
-            >
-              <Mic size={18} aria-hidden="true" />
-              <span className="action-label">{isRecording ? "Stop recording" : "Dictate Tasks"}</span>
-            </button>
-            {isRecording && (
-              <div
-                className="audio-meter"
-                role="progressbar"
-                aria-label="Microphone input level"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={Math.round(audioLevel * 100)}
-              >
-                <span style={{ transform: `scaleX(${Math.max(0.04, audioLevel)})` }} />
-              </div>
-            )}
-            {isRecording && <span className="visually-hidden" id="recording-status">Recording is in progress.</span>}
-          </div>
-        )}
-        {hasSelectedProperty && (
-          <button
-            className={workMode ? "work-mode-button active" : "work-mode-button"}
-            type="button"
-            onClick={onToggleWorkMode}
-            aria-pressed={workMode}
-          >
-            <Wrench size={18} aria-hidden="true" />
-            <span className="action-label">Work Mode</span>
-          </button>
-        )}
-      </div>
+        </div>
+      )}
       {scopeSelector}
     </header>
   );

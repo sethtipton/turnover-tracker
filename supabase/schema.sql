@@ -58,6 +58,10 @@ create table if not exists public.items (
   category text not null default 'Prep',
   kind text not null default 'task' check (kind in ('task', 'material', 'dictation')),
   material_type text check (material_type in ('shopping', 'collect')),
+  constraint items_material_type_matches_kind check (
+    (kind = 'material' and material_type is not null)
+    or (kind <> 'material' and material_type is null)
+  ),
   status text not null default 'approved' check (status in ('pending-review', 'approved', 'done')),
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),

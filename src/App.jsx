@@ -161,6 +161,14 @@ function App() {
     () => new Set(visibleProperties.map((property) => property.id)),
     [visibleProperties],
   );
+  const visiblePortfolioItems = useMemo(
+    () => portfolioItems.filter((item) => visiblePropertyIds.has(item.property_id)),
+    [portfolioItems, visiblePropertyIds],
+  );
+  const visiblePortfolioActivity = useMemo(
+    () => portfolioActivity.filter((entry) => visiblePropertyIds.has(entry.property_id)),
+    [portfolioActivity, visiblePropertyIds],
+  );
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId) || null;
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
   const selectedScopeTitle = selectedProperty
@@ -538,6 +546,26 @@ function App() {
     }
   }
 
+  function renderWorkGrid(compact) {
+    return (
+      <div className="work-grid">
+        {!compact && (
+          <div className="materials-row">
+            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+            <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+          </div>
+        )}
+        <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} />
+        {!compact && (
+          <>
+            <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+            <ActivityLog entries={activityLog} archivedItems={archivedItems} busy={busy} onUnarchive={unarchiveItem} />
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (!isSupabaseConfigured) return <LandingPage onSignIn={signInWithGoogle} setupMissing />;
   if (session === undefined) return <PublicSite listings={[]} busy error="" onSignIn={signInWithGoogle} />;
   if (!session) return <PublicSite listings={publicListings} busy={publicListingsBusy} error={publicListingsError} onSignIn={signInWithGoogle} />;
@@ -552,15 +580,6 @@ function App() {
             property={peopleAccessOpen ? null : selectedProperty}
             scopeTitle={peopleAccessOpen ? "People & Access" : selectedScopeTitle}
             hasSelectedProperty={Boolean(selectedProperty) && !peopleAccessOpen}
-            workMode={workMode}
-            onToggleWorkMode={() => {
-              setWorkMode((current) => !current);
-              setListingView("tasks");
-            }}
-            dictationState={dictationState}
-            audioLevel={audioLevel}
-            onStartDictation={startDictation}
-            onStopDictation={stopDictation}
             isWorkspaceOwner={isWorkspaceOwner}
             peopleAccessOpen={peopleAccessOpen}
             onTogglePeopleAccess={handleTogglePeopleAccess}
@@ -599,16 +618,27 @@ function App() {
               <ListingViewSwitch view={listingView} onViewChange={handleListingViewChange} />
             )}
 
-            {selectedProperty && (listingView === "tasks" || workMode) ? (
-              <SummaryGrid items={activeScopeItems} />
+            {selectedProperty && workMode ? (
+              <SummaryGrid
+                items={activeScopeItems}
+                workMode={workMode}
+                onToggleWorkMode={() => {
+                  setWorkMode((current) => !current);
+                  setListingView("tasks");
+                }}
+                dictationState={dictationState}
+                audioLevel={audioLevel}
+                onStartDictation={startDictation}
+                onStopDictation={stopDictation}
+              />
             ) : !selectedProperty ? (
               <>
                 <PortfolioHome
                   displayName={userDisplayName}
                   properties={visibleProperties}
                   units={units}
-                  items={portfolioItems}
-                  activityLog={portfolioActivity}
+                  items={visiblePortfolioItems}
+                  activityLog={visiblePortfolioActivity}
                   busy={!workspace || portfolioBusy}
                   ownerAccessPropertyIds={ownerAccessPropertyIds}
                   onOpenScope={handleOpenScope}
@@ -635,7 +665,19 @@ function App() {
             )}
 
             {!workMode && selectedProperty && listingView === "tasks" && (
-              <>
+              <section className="listing-workspace task-workspace" aria-label="Tasks workspace">
+                <SummaryGrid
+                  items={activeScopeItems}
+                  workMode={workMode}
+                  onToggleWorkMode={() => {
+                    setWorkMode((current) => !current);
+                    setListingView("tasks");
+                  }}
+                  dictationState={dictationState}
+                  audioLevel={audioLevel}
+                  onStartDictation={startDictation}
+                  onStopDictation={stopDictation}
+                />
                 <ReviewQueue
                   items={reviewItems}
                   busy={busy}
@@ -665,26 +707,11 @@ function App() {
                   onSubmit={handleAddItem}
                 />
                 <StatusMessage message={message} />
-              </>
+                {renderWorkGrid(false)}
+              </section>
             )}
 
-            {selectedProperty && (listingView === "tasks" || workMode) && (
-              <div className="work-grid">
-                {!workMode && (
-                  <div className="materials-row">
-                    <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
-                    <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
-                  </div>
-                )}
-                <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={workMode} compact={workMode} />
-                {!workMode && (
-                  <>
-                    <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
-                    <ActivityLog entries={activityLog} archivedItems={archivedItems} busy={busy} onUnarchive={unarchiveItem} />
-                  </>
-                )}
-              </div>
-            )}
+            {selectedProperty && workMode && renderWorkGrid(true)}
           </>
         )}
       </main>

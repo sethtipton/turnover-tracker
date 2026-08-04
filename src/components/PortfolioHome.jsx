@@ -51,24 +51,27 @@ export function PortfolioHome({
         </h2>
       </header>
 
-      <section className="portfolio-summary" aria-label="Portfolio work summary">
-        <PortfolioMetric label="Open tasks" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={setActivePanel} />
-        <PortfolioMetric label="Pending review" value={overview.totals.pending} busy={busy} tone="review" panel="review" activePanel={activePanel} onToggle={setActivePanel} />
-        <PortfolioMetric label="Shopping items" value={overview.totals.shopping} busy={busy} tone="shopping" panel="shopping" activePanel={activePanel} onToggle={setActivePanel} />
-      </section>
+      <div className="portfolio-workspace">
+        <section className="portfolio-summary" aria-label="Portfolio work summary">
+          <PortfolioMetric label="Open" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={setActivePanel} />
+          <PortfolioMetric label="Pending" value={overview.totals.pending} busy={busy} tone="review" panel="review" activePanel={activePanel} onToggle={setActivePanel} />
+          <PortfolioMetric label="Shopping" value={overview.totals.shopping} busy={busy} tone="shopping" panel="shopping" activePanel={activePanel} onToggle={setActivePanel} />
+          <PortfolioMetric label="Collect" value={overview.totals.collect} busy={busy} tone="collect" panel="collect" activePanel={activePanel} onToggle={setActivePanel} />
+        </section>
 
-      {activePanel && (
-        <PortfolioDrilldown
-          panel={activePanel}
-          properties={properties}
-          units={units}
-          items={items}
-          busy={busy}
-          onOpenScope={onOpenScope}
-          onItemChange={onItemChange}
-          onDeleteItem={onDeleteItem}
-        />
-      )}
+        {activePanel && (
+          <PortfolioDrilldown
+            panel={activePanel}
+            properties={properties}
+            units={units}
+            items={items}
+            busy={busy}
+            onOpenScope={onOpenScope}
+            onItemChange={onItemChange}
+            onDeleteItem={onDeleteItem}
+          />
+        )}
+      </div>
 
       {overview.continueProperty && (
         <ContinuePanel
@@ -145,7 +148,7 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
           </ScopeLink>
           {continueUnit && (
             <ScopeLink className="secondary-link" property={property} onOpenScope={onOpenScope}>
-              Property
+              Property <ArrowRight size={17} aria-hidden="true" />
             </ScopeLink>
           )}
         </div>
@@ -204,6 +207,7 @@ function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
                   {scope.pending} to review
                 </span>
               )}
+              <ArrowRight className="property-scope-arrow" size={16} aria-hidden="true" />
             </ScopeLink>
           ))}
         </nav>
@@ -284,8 +288,8 @@ function PortfolioMetric({ label, value, busy, tone = "open", panel, activePanel
       aria-controls="portfolio-work-drilldown"
       onClick={() => onToggle(isActive ? "" : panel)}
     >
-      <span>{label}</span>
       <strong>{busy ? "-" : value}</strong>
+      <span>{label}</span>
     </button>
   );
 }
@@ -330,7 +334,10 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
       open: propertyItems.filter((item) => item.status === "approved").length,
       pending: propertyItems.filter((item) => item.status === "pending-review").length,
       shopping: propertyItems.filter((item) => (
-        item.material_type === "shopping" && item.status !== "done"
+        item.kind === "material" && item.material_type === "shopping" && item.status !== "done"
+      )).length,
+      collect: propertyItems.filter((item) => (
+        item.kind === "material" && item.material_type === "collect" && item.status !== "done"
       )).length,
     };
   });
@@ -350,7 +357,10 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
       openTasks: actionableItems.filter((item) => item.kind === "task" && item.status === "approved").length,
       pending: actionableItems.filter((item) => item.status === "pending-review").length,
       shopping: actionableItems.filter((item) => (
-        item.material_type === "shopping" && item.status !== "done"
+        item.kind === "material" && item.material_type === "shopping" && item.status !== "done"
+      )).length,
+      collect: actionableItems.filter((item) => (
+        item.kind === "material" && item.material_type === "collect" && item.status !== "done"
       )).length,
     },
   };
