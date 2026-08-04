@@ -749,6 +749,19 @@
 
   .listing-edit-fields .full-width { grid-column: 1 / -1; }
 
+  .auditor-url-control {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.75rem;
+  }
+
+  .auditor-parcel-link {
+    justify-self: start;
+    white-space: nowrap;
+  }
+
   .listing-publish-toggle {
     grid-column: 1 / -1;
     min-height: 2.75rem;
@@ -971,7 +984,19 @@
     gap: 0.5rem;
     min-width: 0;
     padding: 0.75rem 1rem;
+    border: 0;
     border-inline-start: 3px solid var(--portfolio-metric-color);
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &.active {
+      background: color-mix(in oklab, var(--portfolio-metric-color) 10%, var(--color-surface));
+    }
 
     & + & {
       border-block-start: 0;
@@ -979,14 +1004,13 @@
       border-inline-start-color: var(--color-border);
     }
 
-    & dt {
+    & span {
       color: var(--color-text-muted);
       font-size: 0.85rem;
       font-weight: 700;
     }
 
-    & dd {
-      margin: 0;
+    & strong {
       color: var(--portfolio-metric-color);
       font-size: 1.5rem;
       font-weight: 800;
@@ -995,6 +1019,269 @@
 
   .portfolio-metric-review { --portfolio-metric-color: var(--color-review); }
   .portfolio-metric-shopping { --portfolio-metric-color: var(--color-info); }
+
+  .portfolio-drilldown {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+  }
+
+  .portfolio-drilldown-heading,
+  .portfolio-item-group-heading,
+  .portfolio-item-row,
+  .portfolio-item-actions,
+  .portfolio-item-rename {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .portfolio-drilldown-heading {
+    justify-content: space-between;
+    gap: 1rem;
+
+    & > div {
+      display: grid;
+      gap: 0.125rem;
+    }
+
+    & h2 { font-size: 1.25rem; }
+  }
+
+  .portfolio-drilldown-count,
+  .portfolio-item-scope,
+  .portfolio-item-group-heading > span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .portfolio-drilldown-count,
+  .portfolio-item-group-heading > span {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-control);
+    background: var(--color-surface-raised);
+  }
+
+  .portfolio-drilldown-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 0.75rem;
+  }
+
+  :is(.portfolio-drilldown-tasks, .portfolio-drilldown-review, .portfolio-drilldown-shopping) .portfolio-drilldown-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shopping-run {
+    display: grid;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--color-info) 45%, var(--color-border));
+    border-radius: var(--radius-control);
+    background: color-mix(in oklab, var(--color-info) 6%, var(--color-canvas));
+  }
+
+  .shopping-run-toggle {
+    display: grid;
+    width: 100%;
+    min-height: 2.75rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.95rem;
+    text-align: left;
+
+    & svg { transition: transform 160ms ease; }
+    &[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+    & strong {
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-control);
+      background: var(--color-surface-raised);
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+    }
+
+    &:hover { background: color-mix(in oklab, var(--color-info) 10%, var(--color-surface-raised)); }
+  }
+
+  .shopping-run-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+    list-style: none;
+
+    &[hidden] { display: none; }
+  }
+
+  .shopping-run-item {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 3.25rem;
+    padding: 0.5rem 0.625rem;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    cursor: pointer;
+
+    &:hover { background: color-mix(in oklab, var(--color-info) 8%, var(--color-surface)); }
+
+    &:has(input:focus-visible) {
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    & input {
+      width: 1.25rem;
+      height: 1.25rem;
+      margin: 0;
+      accent-color: var(--color-success);
+    }
+  }
+
+  .shopping-run-copy {
+    display: grid;
+    min-width: 0;
+    gap: 0.125rem;
+
+    & strong {
+      font-size: 0.875rem;
+      overflow-wrap: anywhere;
+    }
+
+    & span {
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .portfolio-item-group {
+    min-width: 0;
+    overflow: clip;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-canvas);
+  }
+
+  .portfolio-item-group-heading {
+    justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    border-block-end: 1px solid var(--color-border);
+
+    & a {
+      min-width: 0;
+      color: var(--color-text);
+      text-decoration: none;
+    }
+
+    & a:hover { color: var(--color-primary-hover); }
+    & h3 { font-size: 1.125rem; overflow-wrap: anywhere; }
+  }
+
+  .portfolio-item-list {
+    display: grid;
+    list-style: none;
+  }
+
+  .portfolio-item-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0;
+    padding: 0;
+
+    & + & { border-block-start: 1px solid var(--color-border); }
+  }
+
+  .portfolio-item-copy {
+    display: grid;
+    min-width: 0;
+    align-content: center;
+    gap: 0.125rem;
+    padding: 0.625rem 0.75rem;
+
+    & p {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.375rem;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .portfolio-item-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .portfolio-item-scope {
+    display: grid;
+    inline-size: 6rem;
+    align-content: center;
+    justify-items: start;
+    align-self: stretch;
+    padding: 0.625rem 0.5rem;
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    font-size: 0.75rem;
+    line-height: 1;
+    text-align: left;
+  }
+
+  .portfolio-item-actions {
+    flex: 0 0 auto;
+    gap: 0.25rem;
+    align-self: center;
+    padding: 0.625rem 0.75rem 0.625rem 0;
+  }
+
+  .portfolio-status-action {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    gap: 0.375rem;
+    padding-inline: 0.625rem;
+    border-color: color-mix(in oklab, var(--color-primary) 58%, var(--color-control-border));
+    background: transparent;
+    color: var(--color-primary-hover);
+    font-size: 0.78rem;
+    font-weight: 800;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-raised));
+    }
+  }
+
+  .portfolio-item-actions .icon-button,
+  .portfolio-item-rename .icon-button {
+    width: 2.25rem;
+    min-height: 2.25rem;
+  }
+
+  .portfolio-item-rename {
+    width: min(100%, 28rem);
+
+    & input { min-width: 0; }
+    & button:not(.icon-button) { min-height: 2.25rem; padding-inline: 0.625rem; }
+  }
 
   .portfolio-continue {
     display: grid;
@@ -1400,7 +1687,7 @@
 
     & > span {
       color: var(--color-text-muted);
-      font-size: 0.75rem;
+      font-size: 1rem;
       font-weight: 800;
     }
   }
@@ -1734,6 +2021,11 @@
     }
   }
 
+  .item-title-row:not(:has(.item-title-content > p)) .item-title-content {
+    height: auto;
+    align-self: center;
+  }
+
   .item-editor {
     & label {
       display: grid;
@@ -2006,6 +2298,32 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .app-header:not(.has-property-image) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 0.625rem;
+      row-gap: 0;
+
+      & .app-header-identity {
+        grid-column: 1;
+        grid-row: 1;
+
+        & h1 { font-size: 1.5rem; }
+      }
+
+      & .header-actions {
+        display: flex;
+        grid-column: 2;
+        grid-row: 1;
+        justify-content: end;
+
+        & .people-access-button {
+          width: auto;
+          min-height: 2.75rem;
+          white-space: nowrap;
+        }
+      }
+    }
+
     .app-header.has-property-image .header-actions {
       grid-template-columns: minmax(0, 1fr);
 
@@ -2052,6 +2370,38 @@
       grid-template-columns: minmax(0, 1fr);
       gap: 0.125rem;
       padding: 0.625rem;
+    }
+
+    .portfolio-drilldown {
+      padding: 0.75rem;
+    }
+
+    .portfolio-drilldown-groups {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .portfolio-item-row {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: stretch;
+    }
+
+    .portfolio-item-actions {
+      grid-column: 2;
+      width: 100%;
+      justify-content: flex-end;
+      padding: 0 0.75rem 0.625rem;
+    }
+
+    .portfolio-item-scope {
+      grid-row: 1 / span 2;
+    }
+
+    .portfolio-status-action {
+      margin-inline-end: auto;
+    }
+
+    .portfolio-item-rename {
+      width: 100%;
     }
 
     .portfolio-continue {
@@ -2125,6 +2475,7 @@
     .listing-edit-heading { align-items: start; }
     .listing-edit-heading button { flex: none; }
     .listing-edit-fields { grid-template-columns: minmax(0, 1fr); }
+    .auditor-url-control { grid-template-columns: minmax(0, 1fr); }
     .listing-view-switch button { font-size: 0.75rem; }
   }
 }

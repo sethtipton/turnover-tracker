@@ -27,7 +27,7 @@
     --color-focus: #ffe08a;
     --color-on-action: #151107;
 
-    --content-width: min(74rem, calc(100% - 2rem));
+    --content-width: min(80rem, calc(100% - 2rem));
     --radius-control: 0.375rem;
     --radius-panel: 0.5rem;
     --shadow-raised: 0 1rem 2.5rem rgb(0 0 0 / 0.24);

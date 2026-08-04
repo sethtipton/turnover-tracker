@@ -21,6 +21,15 @@ const LEGACY_PROPERTY_ROUTES = {
   "124-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "124" },
   "126-n-mantua": { propertyName: "124/126 N Mantua", unitName: "126" },
   "126-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "126" },
+  "127-s-pearl": { propertyName: "133 S Pearl" },
+  "127-s-pearl-up": { propertyName: "133 S Pearl", unitName: "UP" },
+  "127-s-pearl-down": { propertyName: "133 S Pearl", unitName: "DOWN" },
+  "322-park": { propertyName: "310 Park", unitName: "AirBnB" },
+};
+
+const PUBLIC_PROPERTY_ROUTE_ALIASES = {
+  "127-s-pearl": "133-s-pearl",
+  "322-park": "310-park",
 };
 
 export function normalizeBasePath(path) {
@@ -87,7 +96,7 @@ export function getScopeFromCurrentPath(properties, units) {
 export function getPublicRouteFromCurrentPath() {
   const routeParts = getCurrentRouteParts();
   return {
-    propertySlug: routeParts[0] || "",
+    propertySlug: PUBLIC_PROPERTY_ROUTE_ALIASES[routeParts[0]] || routeParts[0] || "",
     unitSlug: routeParts[1] || "",
   };
 }

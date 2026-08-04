@@ -5,7 +5,9 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ExternalLink,
   Home,
+  Landmark,
   MapPin,
   Maximize,
   Save,
@@ -306,6 +308,21 @@ function PropertyEditor({ property, busy, onSave }) {
           <Field label="Neighborhood or area" name="neighborhood" value={form.neighborhood} onChange={change} />
         </div>
       </details>
+      <details>
+        <summary><span>Property records</span><ChevronDown size={18} aria-hidden="true" /></summary>
+        <div className="listing-edit-fields">
+          <div className="auditor-url-control">
+            <Field label="Auditor parcel URL" name="auditor_parcel_url" type="url" value={form.auditor_parcel_url} onChange={change} />
+            {form.auditor_parcel_url && (
+              <a className="secondary-link auditor-parcel-link" href={form.auditor_parcel_url} target="_blank" rel="noreferrer">
+                <Landmark size={17} aria-hidden="true" />
+                <span>Open Auditor parcel</span>
+                <ExternalLink size={15} aria-hidden="true" />
+              </a>
+            )}
+          </div>
+        </div>
+      </details>
     </form>
   );
 }
@@ -420,6 +437,7 @@ function toPropertyForm(property) {
     state: property.state || "",
     postal_code: property.postal_code || "",
     neighborhood: property.neighborhood || "",
+    auditor_parcel_url: property.auditor_parcel_url || "",
   };
 }
 

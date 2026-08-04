@@ -17,7 +17,7 @@ export function ItemColumn({
   forceOpen = false,
   compact = false,
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const panelId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-items`;
   const isOpen = forceOpen || !isCollapsed;
   const orderedItems = sortItemsForDisplay(items);

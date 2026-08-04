@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ShoppingCart,
 } from "lucide-react";
+import { PortfolioDrilldown } from "./PortfolioDrilldown";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -24,7 +25,10 @@ export function PortfolioHome({
   busy,
   ownerAccessPropertyIds,
   onOpenScope,
+  onItemChange,
+  onDeleteItem,
 }) {
+  const [activePanel, setActivePanel] = useState("");
   const overview = useMemo(
     () => buildPortfolioOverview(properties, units, items, activityLog),
     [activityLog, items, properties, units],
@@ -47,11 +51,24 @@ export function PortfolioHome({
         </h2>
       </header>
 
-      <dl className="portfolio-summary" aria-label="Portfolio work summary">
-        <PortfolioMetric label="Open tasks" value={overview.totals.openTasks} busy={busy} />
-        <PortfolioMetric label="Pending review" value={overview.totals.pending} busy={busy} tone="review" />
-        <PortfolioMetric label="Shopping items" value={overview.totals.shopping} busy={busy} tone="shopping" />
-      </dl>
+      <section className="portfolio-summary" aria-label="Portfolio work summary">
+        <PortfolioMetric label="Open tasks" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={setActivePanel} />
+        <PortfolioMetric label="Pending review" value={overview.totals.pending} busy={busy} tone="review" panel="review" activePanel={activePanel} onToggle={setActivePanel} />
+        <PortfolioMetric label="Shopping items" value={overview.totals.shopping} busy={busy} tone="shopping" panel="shopping" activePanel={activePanel} onToggle={setActivePanel} />
+      </section>
+
+      {activePanel && (
+        <PortfolioDrilldown
+          panel={activePanel}
+          properties={properties}
+          units={units}
+          items={items}
+          busy={busy}
+          onOpenScope={onOpenScope}
+          onItemChange={onItemChange}
+          onDeleteItem={onDeleteItem}
+        />
+      )}
 
       {overview.continueProperty && (
         <ContinuePanel
@@ -256,12 +273,20 @@ function ProgressBar({ value, total, label }) {
   );
 }
 
-function PortfolioMetric({ label, value, busy, tone = "open" }) {
+function PortfolioMetric({ label, value, busy, tone = "open", panel, activePanel, onToggle }) {
+  const isActive = activePanel === panel;
+
   return (
-    <div className={`portfolio-metric portfolio-metric-${tone}`}>
-      <dt>{label}</dt>
-      <dd>{busy ? "-" : value}</dd>
-    </div>
+    <button
+      className={`portfolio-metric portfolio-metric-${tone}${isActive ? " active" : ""}`}
+      type="button"
+      aria-expanded={isActive}
+      aria-controls="portfolio-work-drilldown"
+      onClick={() => onToggle(isActive ? "" : panel)}
+    >
+      <span>{label}</span>
+      <strong>{busy ? "-" : value}</strong>
+    </button>
   );
 }
 

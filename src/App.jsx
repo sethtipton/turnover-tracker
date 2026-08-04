@@ -28,12 +28,14 @@ import {
   getAttachmentUrl,
   getSession,
   loadPropertyMembers,
+  loadPropertyVisibilityPreferences,
   loadPublicListings,
   loadProperties,
   loadUnits,
   loadWorkspace,
   loadWorkspaceMembers,
   setPropertyMemberAccess,
+  setPropertyVisibilityPreference,
   signInWithGoogle,
   signOut,
   updateProperty,
@@ -68,7 +70,9 @@ function App() {
   const [peopleAccessOpen, setPeopleAccessOpen] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState([]);
   const [propertyMembers, setPropertyMembers] = useState([]);
+  const [propertyVisibility, setPropertyVisibility] = useState([]);
   const [accessBusy, setAccessBusy] = useState(false);
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [dictationBusy, setDictationBusy] = useState(false);
   const [listingView, setListingView] = useState("tasks");
   const [listingBusy, setListingBusy] = useState(false);
@@ -114,6 +118,8 @@ function App() {
     items: portfolioItems,
     activityLog: portfolioActivity,
     busy: portfolioBusy,
+    updatePortfolioItem,
+    removePortfolioItem,
   } = usePortfolioOverview({
     workspaceId: workspace?.id,
     enabled: Boolean(workspace?.id && !selectedPropertyId),
@@ -134,6 +140,26 @@ function App() {
         )))
         .map((property) => property.id)
       : [],
+  );
+  const hiddenPropertyIds = useMemo(
+    () => new Set(propertyVisibility
+      .filter((preference) => !preference.is_visible_on_home)
+      .map((preference) => preference.property_id)),
+    [propertyVisibility],
+  );
+  const visibleProperties = useMemo(
+    () => properties.filter((property) => !hiddenPropertyIds.has(property.id)),
+    [hiddenPropertyIds, properties],
+  );
+  const selectorProperties = useMemo(
+    () => properties.filter((property) => (
+      !hiddenPropertyIds.has(property.id) || property.id === selectedPropertyId
+    )),
+    [hiddenPropertyIds, properties, selectedPropertyId],
+  );
+  const visiblePropertyIds = useMemo(
+    () => new Set(visibleProperties.map((property) => property.id)),
+    [visibleProperties],
   );
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId) || null;
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) || null;
@@ -180,10 +206,11 @@ function App() {
       setAccessError("");
       try {
         const workspaceData = await loadWorkspace();
-        const [propertyData, unitData, memberData] = await Promise.all([
+        const [propertyData, unitData, memberData, visibilityData] = await Promise.all([
           loadProperties(workspaceData.id),
           loadUnits(workspaceData.id),
           loadWorkspaceMembers(workspaceData.id),
+          loadPropertyVisibilityPreferences(workspaceData.id, session.user.id),
         ]);
         const isOwner = memberData.some((member) => (
           member.email === session.user.email?.toLowerCase() && member.role === "owner"
@@ -197,6 +224,7 @@ function App() {
         setUnits(unitData);
         setWorkspaceMembers(memberData);
         setPropertyMembers(propertyMemberData);
+        setPropertyVisibility(visibilityData);
         setSelectedPropertyId(routeScope.propertyId);
         setSelectedUnitId(routeScope.unitId);
 
@@ -343,6 +371,30 @@ function App() {
     }
   }
 
+  async function handleSetPropertyVisibility(propertyId, isVisibleOnHome) {
+    if (!workspace || !session?.user) return;
+
+    setVisibilityBusy(true);
+    try {
+      await setPropertyVisibilityPreference({
+        workspaceId: workspace.id,
+        userId: session.user.id,
+        propertyId,
+        isVisibleOnHome,
+      });
+      setPropertyVisibility((current) => [
+        ...current.filter((preference) => preference.property_id !== propertyId),
+        { property_id: propertyId, is_visible_on_home: isVisibleOnHome },
+      ]);
+      const propertyName = properties.find((property) => property.id === propertyId)?.name || "Property";
+      setMessage(`${propertyName} ${isVisibleOnHome ? "shown on" : "hidden from"} your homepage.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setVisibilityBusy(false);
+    }
+  }
+
   async function handleSaveListingProperty(patch) {
     if (!selectedProperty) return;
     setListingBusy(true);
@@ -389,6 +441,30 @@ function App() {
   async function handleDeleteItem(item) {
     if (!window.confirm(`Delete "${item.title}" and its attachments?`)) return;
     await removeItem(item, `${item.title} deleted.`);
+  }
+
+  async function handlePortfolioItemChange(item, patch) {
+    const nextTitle = patch.title?.trim() || item.title;
+    const nextStatus = patch.status || item.status;
+    const completedAt = nextStatus === "done"
+      ? item.completed_at || new Date().toISOString()
+      : null;
+    const successMessage = nextStatus === "approved" && item.status === "pending-review"
+      ? `${nextTitle} approved.`
+      : nextStatus === "done"
+        ? `${nextTitle} marked done.`
+        : `${nextTitle} updated.`;
+
+    return updatePortfolioItem(item, {
+      ...patch,
+      title: nextTitle,
+      completed_at: completedAt,
+    }, successMessage);
+  }
+
+  async function handleDeletePortfolioItem(item) {
+    if (!window.confirm(`Delete "${item.title}" and its attachments?`)) return false;
+    return removePortfolioItem(item, `${item.title} deleted.`);
   }
 
   async function handleRejectItem(item) {
@@ -490,7 +566,7 @@ function App() {
             onTogglePeopleAccess={handleTogglePeopleAccess}
             scopeSelector={!peopleAccessOpen && !workMode && selectedProperty ? (
               <ScopeSelector
-                properties={properties}
+                properties={selectorProperties}
                 units={units}
                 selectedPropertyId={selectedPropertyId}
                 selectedUnitId={selectedUnitId}
@@ -508,8 +584,12 @@ function App() {
               properties={properties}
               propertyMembers={propertyMembers}
               busy={accessBusy}
+              currentUserEmail={userEmail}
+              visiblePropertyIds={visiblePropertyIds}
+              visibilityBusy={visibilityBusy}
               onClose={() => setPeopleAccessOpen(false)}
               onSave={handleSavePropertyAccess}
+              onSetPropertyVisibility={handleSetPropertyVisibility}
             />
             <StatusMessage message={message} />
           </>
@@ -525,13 +605,15 @@ function App() {
               <>
                 <PortfolioHome
                   displayName={userDisplayName}
-                  properties={properties}
+                  properties={visibleProperties}
                   units={units}
                   items={portfolioItems}
                   activityLog={portfolioActivity}
                   busy={!workspace || portfolioBusy}
                   ownerAccessPropertyIds={ownerAccessPropertyIds}
                   onOpenScope={handleOpenScope}
+                  onItemChange={handlePortfolioItemChange}
+                  onDeleteItem={handleDeletePortfolioItem}
                 />
                 <StatusMessage message={message} />
               </>

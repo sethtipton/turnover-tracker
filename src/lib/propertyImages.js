@@ -2,7 +2,6 @@ import imageFourVine from "../../property-images/processed/4-vine-ct.webp";
 import imageOneTwentyFourMantua from "../../property-images/processed/124-n-mantua-st.webp";
 import imageOneTwentySevenPearl from "../../property-images/processed/127-s-pearl-st.webp";
 import imageThreeTenPark from "../../property-images/processed/310-park-ave.webp";
-import imageThreeTwentyTwoPark from "../../property-images/processed/322-park-ave.webp";
 import imageFourFortyOnePark from "../../property-images/processed/441-park-ave.webp";
 import imageFourFiftyOnePark from "../../property-images/processed/451-park-ave.webp";
 import imageFourFiftyEightMain from "../../property-images/processed/458-w-main-st.webp";
@@ -17,8 +16,7 @@ const PROPERTY_IMAGES = {
   "124/126 N Mantua": imageOneTwentyFourMantua,
   "469 Carthage": imageFourSixtyNineCarthage,
   "458 W Main": imageFourFiftyEightMain,
-  "127 S Pearl": imageOneTwentySevenPearl,
-  "322 Park": imageThreeTwentyTwoPark,
+  "133 S Pearl": imageOneTwentySevenPearl,
   "310 Park": imageThreeTenPark,
 };
 

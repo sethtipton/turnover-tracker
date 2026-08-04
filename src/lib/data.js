@@ -117,6 +117,31 @@ export async function loadPropertyMembers(workspaceId) {
   return data || [];
 }
 
+export async function loadPropertyVisibilityPreferences(workspaceId, userId) {
+  const { data, error } = await supabase
+    .from("user_property_preferences")
+    .select("property_id,is_visible_on_home")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setPropertyVisibilityPreference({ workspaceId, userId, propertyId, isVisibleOnHome }) {
+  const { error } = await supabase
+    .from("user_property_preferences")
+    .upsert({
+      user_id: userId,
+      workspace_id: workspaceId,
+      property_id: propertyId,
+      is_visible_on_home: isVisibleOnHome,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,property_id" });
+
+  if (error) throw error;
+}
+
 export async function setPropertyMemberAccess({ workspaceId, email, propertyIds }) {
   const { error } = await supabase.rpc("set_property_member_access", {
     target_workspace_id: workspaceId,
@@ -131,7 +156,7 @@ export async function loadPortfolioOverview(workspaceId) {
   const [itemsResult, activityResult] = await Promise.all([
     supabase
       .from("items")
-      .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at")
+      .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at,attachments(id,storage_path,file_name)")
       .eq("workspace_id", workspaceId)
       .is("archived_at", null),
     supabase

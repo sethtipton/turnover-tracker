@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, LoaderCircle, Save, ShieldCheck, UsersRound } from "lucide-react";
 
-export function PeopleAccess({ members, properties, propertyMembers, busy, onClose, onSave }) {
+export function PeopleAccess({
+  members,
+  properties,
+  propertyMembers,
+  busy,
+  currentUserEmail,
+  visiblePropertyIds,
+  visibilityBusy,
+  onClose,
+  onSave,
+  onSetPropertyVisibility,
+}) {
   const [selectedEmail, setSelectedEmail] = useState("");
   const [selectedPropertyIds, setSelectedPropertyIds] = useState([]);
 
@@ -21,6 +32,7 @@ export function PeopleAccess({ members, properties, propertyMembers, busy, onClo
   const selectedMember = members.find((member) => member.email === selectedEmail) || null;
   const assignedPropertyIds = useMemo(() => new Set(selectedPropertyIds), [selectedPropertyIds]);
   const isOwner = selectedMember?.role === "owner";
+  const isCurrentUser = selectedMember?.email === currentUserEmail;
 
   function toggleProperty(propertyId) {
     setSelectedPropertyIds((current) => (
@@ -96,6 +108,29 @@ export function PeopleAccess({ members, properties, propertyMembers, busy, onClo
                   })}
                 </div>
               </fieldset>
+
+              {isOwner && isCurrentUser && (
+                <fieldset className="property-visibility" disabled={visibilityBusy}>
+                  <legend>My homepage</legend>
+                  <p className="access-note">Choose the properties included in your homepage, counts, and portfolio work lists.</p>
+                  <div className="property-access-list">
+                    {properties.map((property) => {
+                      const isVisible = visiblePropertyIds.has(property.id);
+                      return (
+                        <label key={property.id} className={isVisible ? "assigned" : ""}>
+                          <input
+                            type="checkbox"
+                            checked={isVisible}
+                            onChange={() => onSetPropertyVisibility(property.id, !isVisible)}
+                          />
+                          <span>{property.name}</span>
+                          <Check size={17} aria-hidden="true" />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              )}
 
               {!isOwner && (
                 <div className="access-editor-actions">

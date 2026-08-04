@@ -21,9 +21,19 @@ create table if not exists public.properties (
   name text not null,
   status text not null default 'active',
   sort_order integer not null default 0,
+  auditor_parcel_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (workspace_id, name)
+);
+
+create table if not exists public.user_property_preferences (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  is_visible_on_home boolean not null default true,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, property_id)
 );
 
 create table if not exists public.units (
@@ -101,6 +111,7 @@ on public.activity_log (property_id, unit_id, created_at desc);
 alter table public.workspaces enable row level security;
 alter table public.workspace_members enable row level security;
 alter table public.properties enable row level security;
+alter table public.user_property_preferences enable row level security;
 alter table public.units enable row level security;
 alter table public.items enable row level security;
 alter table public.attachments enable row level security;
@@ -199,7 +210,8 @@ begin
     activity_label := new.title;
   elsif tg_op = 'DELETE' then
     activity_action := 'deleted';
-    activity_item_id := old.id;
+    -- The item no longer exists after an AFTER DELETE trigger runs.
+    activity_item_id := null;
     activity_workspace_id := old.workspace_id;
     activity_property_id := old.property_id;
     activity_unit_id := old.unit_id;
@@ -320,6 +332,14 @@ create policy "Editors can manage properties"
 on public.properties for all to authenticated
 using (public.can_edit_workspace(workspace_id))
 with check (public.can_edit_workspace(workspace_id));
+
+create policy "Users can manage their property preferences"
+on public.user_property_preferences for all to authenticated
+using (user_id = auth.uid())
+with check (
+  user_id = auth.uid()
+  and public.is_workspace_member(workspace_id)
+);
 
 create policy "Members can read units"
 on public.units for select to authenticated
@@ -448,9 +468,8 @@ cross join (values
   ('124/126 N Mantua', 5),
   ('469 Carthage', 6),
   ('458 W Main', 7),
-  ('127 S Pearl', 8),
-  ('322 Park', 9),
-  ('310 Park', 10)
+  ('133 S Pearl', 8),
+  ('310 Park', 9)
 ) as seed(name, sort_order)
 where workspace.name = 'Tipton Rentals'
 on conflict (workspace_id, name) do update set sort_order = excluded.sort_order;
@@ -472,10 +491,10 @@ join (values
   ('469 Carthage', 'Main Unit', 1),
   ('458 W Main', 'UP', 1),
   ('458 W Main', 'DOWN', 2),
-  ('127 S Pearl', 'UP', 1),
-  ('127 S Pearl', 'DOWN', 2),
-  ('322 Park', 'AirBnB', 1),
-  ('310 Park', 'Brewery', 1)
+  ('133 S Pearl', 'UP', 1),
+  ('133 S Pearl', 'DOWN', 2),
+  ('310 Park', 'Brewery', 1),
+  ('310 Park', 'AirBnB', 2)
 ) as seed(property_name, unit_name, sort_order) on seed.property_name = property.name
 where workspace.name = 'Tipton Rentals'
 on conflict (property_id, name) do update set sort_order = excluded.sort_order;
