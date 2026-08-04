@@ -26,6 +26,7 @@ export function AppHeader({
     "app-header",
     propertyImage && "has-property-image",
     scopeSelector && "has-scope-selector",
+    workMode && "work-mode-active",
   ].filter(Boolean).join(" ");
 
   return (

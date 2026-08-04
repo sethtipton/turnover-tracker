@@ -524,6 +524,7 @@
 
     & span {
       display: inline-flex;
+      width: 100%;
       min-width: 0;
       align-items: center;
       gap: 0.3rem;
@@ -2275,6 +2276,21 @@
         align-self: start;
         align-content: start;
         padding-block: 0;
+      }
+
+      &.work-mode-active .header-actions {
+        grid-column: 4;
+        grid-row: 1 / span 2;
+        align-self: start;
+        align-content: start;
+        justify-self: end;
+        justify-items: end;
+
+        & > :is(button, .dictation-control) {
+          width: auto;
+          min-width: 0;
+          align-self: start;
+        }
       }
     }
 
