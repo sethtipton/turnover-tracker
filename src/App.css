@@ -89,7 +89,7 @@
   }
 
   .preview-row.done {
-    color: var(--color-success);
+    color: var(--color-complete);
   }
 
   .dictate-preview {
@@ -695,6 +695,7 @@
     background: var(--color-surface-raised);
     color: var(--color-text-muted);
     font-size: 0.875rem;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   }
 
   :where(.listing-view-switch button, .portfolio-metric).active {
@@ -712,6 +713,17 @@
     border: 1px solid var(--color-border);
     border-radius: 0 0 var(--radius-panel) var(--radius-panel);
     background: var(--color-surface);
+  }
+
+  .listing-workspace-enter {
+    animation: listing-workspace-enter 200ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  @keyframes listing-workspace-enter {
+    from {
+      opacity: 0;
+      translate: 0 0.25rem;
+    }
   }
 
   .task-workspace {
@@ -978,8 +990,8 @@
     }
   }
 
-  .metric-review { --metric-color: var(--color-review); }
-  .metric-done { --metric-color: var(--color-success); }
+  .metric-review { --metric-color: var(--color-pending); }
+  .metric-done { --metric-color: var(--color-complete); }
   .metric-shopping { --metric-color: var(--color-info); }
 
   /* Portfolio home */
@@ -1022,6 +1034,11 @@
     overflow: visible;
   }
 
+  .portfolio-workspace:not(:has(.portfolio-drilldown-shell.is-open)) .portfolio-metric {
+    border-block-end: 1px solid transparent;
+    border-radius: var(--radius-control);
+  }
+
   .portfolio-metric {
     --portfolio-metric-color: var(--color-primary);
     display: flex;
@@ -1052,18 +1069,51 @@
     }
   }
 
-  .portfolio-metric-review { --portfolio-metric-color: var(--color-review); }
-  .portfolio-metric-shopping { --portfolio-metric-color: var(--color-info); }
-  .portfolio-metric-collect { --portfolio-metric-color: var(--color-success); }
+  .portfolio-metric.active {
+    border-color: color-mix(in oklab, var(--portfolio-metric-color) 58%, var(--color-border));
+    background: var(--color-surface);
+
+    & span { color: var(--color-text); }
+  }
+
+  .portfolio-metric-review { --portfolio-metric-color: var(--color-pending); }
+  .portfolio-metric-shopping { --portfolio-metric-color: var(--color-shopping); }
+  .portfolio-metric-collect { --portfolio-metric-color: var(--color-collect); }
 
   .portfolio-drilldown {
+    --portfolio-panel-color: var(--color-task);
     display: grid;
     gap: 0.875rem;
     padding: 1rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--portfolio-panel-color);
     border-radius: 0 0 var(--radius-panel) var(--radius-panel);
     background: var(--color-surface);
   }
+
+  .portfolio-drilldown-shell {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: clip;
+    transition: grid-template-rows 200ms cubic-bezier(0.2, 0, 0, 1);
+
+    &.is-open { grid-template-rows: 1fr; }
+
+    & > .portfolio-drilldown {
+      min-height: 0;
+      opacity: 0;
+      translate: 0 -0.25rem;
+      transition: opacity 160ms ease, translate 200ms cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    &.is-open > .portfolio-drilldown {
+      opacity: 1;
+      translate: 0;
+    }
+  }
+
+  .portfolio-drilldown-review { --portfolio-panel-color: var(--color-pending); }
+  .portfolio-drilldown-shopping { --portfolio-panel-color: var(--color-shopping); }
+  .portfolio-drilldown-collect { --portfolio-panel-color: var(--color-collect); }
 
   .portfolio-drilldown-heading,
   .portfolio-item-group-heading,
@@ -1104,6 +1154,16 @@
     background: var(--color-surface-raised);
   }
 
+  .portfolio-item-group-heading > span {
+    background: color-mix(in oklab, var(--portfolio-panel-color) 12%, var(--color-surface-raised));
+    color: var(--portfolio-panel-color);
+  }
+
+  .portfolio-drilldown-count {
+    background: color-mix(in oklab, var(--portfolio-panel-color) 12%, var(--color-surface-raised));
+    color: var(--portfolio-panel-color);
+  }
+
   .portfolio-drilldown-groups {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
@@ -1115,13 +1175,16 @@
   }
 
   .shopping-run {
+    --shopping-run-color: var(--color-shopping);
     display: grid;
     gap: 0.625rem;
 
-    border: 1px solid color-mix(in oklab, var(--color-info) 45%, var(--color-border));
+    border: 1px solid color-mix(in oklab, var(--shopping-run-color) 45%, var(--color-border));
     border-radius: var(--radius-control);
-    background: color-mix(in oklab, var(--color-info) 6%, var(--color-canvas));
+    background: color-mix(in oklab, var(--shopping-run-color) 6%, var(--color-canvas));
   }
+
+  .portfolio-drilldown-collect .shopping-run { --shopping-run-color: var(--color-collect); }
 
   .shopping-run-toggle {
     display: grid;
@@ -1130,7 +1193,7 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem;
+    padding: 0.5rem .8rem .5rem 1rem;
     border: 0;
     border-radius: var(--radius-control);
     background: transparent;
@@ -1145,12 +1208,12 @@
     & strong {
       padding: 0.25rem 0.5rem;
       border-radius: var(--radius-control);
-      background: var(--color-surface-raised);
-      color: var(--color-text-muted);
+      background: color-mix(in oklab, var(--shopping-run-color) 12%, var(--color-surface-raised));
+      color: var(--shopping-run-color);
       font-size: 0.78rem;
     }
 
-    &:hover { background: color-mix(in oklab, var(--color-info) 10%, var(--color-surface-raised)); }
+    &:hover { background: color-mix(in oklab, var(--shopping-run-color) 10%, var(--color-surface-raised)); }
   }
 
   .shopping-run-list {
@@ -1186,7 +1249,7 @@
       width: 1.25rem;
       height: 1.25rem;
       margin: 0;
-      accent-color: var(--color-success);
+      accent-color: var(--color-complete);
     }
   }
 
@@ -1332,9 +1395,9 @@
     align-items: center;
     gap: 0.375rem;
     padding-inline: 0.625rem;
-    border-color: color-mix(in oklab, var(--color-primary) 58%, var(--color-control-border));
+    border-color: color-mix(in oklab, var(--portfolio-panel-color) 58%, var(--color-control-border));
     background: transparent;
-    color: var(--color-primary-hover);
+    color: var(--portfolio-panel-color);
     font-size: 0.78rem;
     font-weight: 800;
     line-height: 0;
@@ -1342,7 +1405,7 @@
       transform: translate(0, 1px);
     }
     &:hover:not(:disabled) {
-      background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-raised));
+      background: color-mix(in oklab, var(--portfolio-panel-color) 12%, var(--color-surface-raised));
     }
   }
 
@@ -1609,7 +1672,7 @@
     gap: 0.625rem;
 
     & h3 {
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       line-height: 1.2;
       overflow-wrap: anywhere;
     }
@@ -1651,8 +1714,8 @@
     line-height: 1.7;
   }
   .property-state-done {
-    border-color: var(--color-success);
-    color: var(--color-success);
+    border-color: var(--color-complete);
+    color: var(--color-complete);
   }
 
   @media (prefers-reduced-transparency: reduce) {
@@ -2030,11 +2093,13 @@
     --status-color: var(--color-primary);
     transition: background-color 180ms ease, border-color 180ms ease;
 
-    &.status-pending-review { --status-color: var(--color-review); }
+    &.material-shopping { --status-color: var(--color-shopping); }
+    &.material-collect { --status-color: var(--color-collect); }
+    &.status-pending-review { --status-color: var(--color-pending); }
     &.status-done {
-      --status-color: var(--color-success);
+      --status-color: var(--color-complete);
       border-inline-start-width: 6px;
-      background: color-mix(in oklab, var(--color-success) 11%, var(--color-surface-raised));
+      background: color-mix(in oklab, var(--color-complete) 8%, var(--color-surface-raised));
     }
 
     &.status-done h3 {
@@ -2048,9 +2113,9 @@
     }
 
     &.status-done .check-button {
-      border-color: var(--color-success);
-      background: var(--color-success);
-      color: var(--color-on-action);
+      border-color: var(--color-complete);
+      background: var(--color-complete);
+      color: var(--color-bg);
     }
 
     & p {
@@ -2176,9 +2241,9 @@
   }
 
   .item-actions .status-select-done {
-    border-color: var(--color-success);
-    background-color: color-mix(in oklab, var(--color-success) 10%, var(--color-field));
-    color: var(--color-success);
+    border-color: var(--color-complete);
+    background-color: color-mix(in oklab, var(--color-complete) 10%, var(--color-field));
+    color: var(--color-complete);
     font-weight: 800;
   }
 
@@ -2293,7 +2358,7 @@
     background: var(--color-info);
   }
 
-  .activity-completed .activity-marker { background: var(--color-success); }
+  .activity-completed .activity-marker { background: var(--color-complete); }
   .activity-archived .activity-marker { background: var(--color-text-muted); }
   :where(.activity-deleted, .activity-attachment-removed) .activity-marker { background: var(--color-danger); }
 
@@ -2595,5 +2660,11 @@
 
   .item-title-row.without-completion {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.portfolio-metric, .portfolio-drilldown-shell, .portfolio-drilldown-shell > .portfolio-drilldown) {
+    transition: none;
   }
 }

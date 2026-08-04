@@ -4,7 +4,7 @@ export const INITIAL_PROPERTIES = [
   { name: "451 Park", units: ["UP", "DOWN"] },
   { name: "441 Park", units: ["UP", "DOWN"] },
   { name: "1065/1067 Hudson", units: ["1065", "1067"] },
-  { name: "4 Vine Ct", units: ["Main Unit"] },
+  { name: "4 Vine", units: ["Main Unit"] },
   { name: "124/126 N Mantua", units: ["124", "126"] },
   { name: "469 Carthage", units: ["Main Unit"] },
   { name: "458 W Main", units: ["UP", "DOWN"] },

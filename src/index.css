@@ -18,13 +18,18 @@
     --color-placeholder: #8795a1;
     --color-border: #637783;
     --color-control-border: #718692;
-    --color-primary: #f0c36a;
-    --color-primary-hover: #ffd889;
-    --color-review: #c89cf4;
-    --color-success: #52d497;
+    --color-task: #e6bb62;
+    --color-pending: #b99ada;
+    --color-shopping: #69a9d5;
+    --color-collect: #62b58b;
+    --color-complete: #9aabb7;
+    --color-primary: var(--color-task);
+    --color-primary-hover: #f2cf80;
+    --color-review: var(--color-pending);
+    --color-success: var(--color-collect);
     --color-danger: #ff7d75;
-    --color-info: #6fa8ff;
-    --color-focus: #ffe08a;
+    --color-info: var(--color-shopping);
+    --color-focus: #f6d481;
     --color-on-action: #151107;
 
     --content-width: min(80rem, calc(100% - 2rem));

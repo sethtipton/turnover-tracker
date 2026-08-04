@@ -78,9 +78,10 @@ export function ItemColumn({
 function ItemCard({ item, compact, mediaUrls, onItemChange, onStatus, onDelete, onUpload, onDeleteAttachment, onArchive }) {
   const [editRequest, setEditRequest] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const itemTypeClass = item.kind === "material" ? `material-${item.material_type}` : "work-task";
 
   return (
-    <li className={`item-card status-${item.status}`} style={{ viewTransitionName: `item-${item.id}` }}>
+    <li className={`item-card ${itemTypeClass} status-${item.status}`} style={{ viewTransitionName: `item-${item.id}` }}>
       <div className="item-main">
         <EditableItem
           item={item}

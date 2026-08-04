@@ -62,7 +62,7 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
   );
 }
 
-export function ListingWorkspace({ property, units, selectedUnit, view, busy, onSaveProperty, onSaveUnit }) {
+export function ListingWorkspace({ property, units, selectedUnit, view, busy, onSaveProperty, onSaveUnit, animated = false }) {
   const propertyUnits = units.filter((unit) => unit.property_id === property.id);
   const displayUnit = selectedUnit || (propertyUnits.length === 1 ? propertyUnits[0] : null);
   const listings = propertyUnits.map((unit) => createListingPreview(property, unit));
@@ -71,7 +71,7 @@ export function ListingWorkspace({ property, units, selectedUnit, view, busy, on
     : null;
 
   return (
-    <section className="listing-workspace" aria-label="Public listing workspace">
+    <section className={`listing-workspace${animated ? " listing-workspace-enter" : ""}`} aria-label="Public listing workspace">
       {view === "edit" ? (
         <ListingEditor
           property={property}

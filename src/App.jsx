@@ -437,6 +437,7 @@ function App() {
   }
 
   function handleListingViewChange(nextView) {
+    if (nextView === listingView) return;
     setListingView(nextView);
     if (nextView !== "tasks") setWorkMode(false);
   }
@@ -651,21 +652,23 @@ function App() {
 
             {selectedProperty && listingView !== "tasks" && !workMode && (
               <>
-                <ListingWorkspace
-                  property={selectedProperty}
-                  units={units}
-                  selectedUnit={selectedUnit}
-                  view={listingView}
-                  busy={listingBusy}
-                  onSaveProperty={handleSaveListingProperty}
-                  onSaveUnit={handleSaveListingUnit}
+              <ListingWorkspace
+                key={listingView}
+                property={selectedProperty}
+                units={units}
+                selectedUnit={selectedUnit}
+                view={listingView}
+                busy={listingBusy}
+                onSaveProperty={handleSaveListingProperty}
+                onSaveUnit={handleSaveListingUnit}
+                animated
                 />
                 <StatusMessage message={message} />
               </>
             )}
 
             {!workMode && selectedProperty && listingView === "tasks" && (
-              <section className="listing-workspace task-workspace" aria-label="Tasks workspace">
+              <section className="listing-workspace listing-workspace-enter task-workspace" aria-label="Tasks workspace">
                 <SummaryGrid
                   items={activeScopeItems}
                   workMode={workMode}

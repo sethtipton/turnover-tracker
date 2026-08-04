@@ -29,10 +29,16 @@ export function PortfolioHome({
   onDeleteItem,
 }) {
   const [activePanel, setActivePanel] = useState("");
+  const [renderedPanel, setRenderedPanel] = useState("tasks");
   const overview = useMemo(
     () => buildPortfolioOverview(properties, units, items, activityLog),
     [activityLog, items, properties, units],
   );
+
+  function togglePanel(nextPanel) {
+    if (nextPanel) setRenderedPanel(nextPanel);
+    setActivePanel(nextPanel);
+  }
 
   if (properties.length === 0 && !busy) {
     return (
@@ -53,15 +59,15 @@ export function PortfolioHome({
 
       <div className="portfolio-workspace">
         <section className="portfolio-summary" aria-label="Portfolio work summary">
-          <PortfolioMetric label="Open" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={setActivePanel} />
-          <PortfolioMetric label="Pending" value={overview.totals.pending} busy={busy} tone="review" panel="review" activePanel={activePanel} onToggle={setActivePanel} />
-          <PortfolioMetric label="Shopping" value={overview.totals.shopping} busy={busy} tone="shopping" panel="shopping" activePanel={activePanel} onToggle={setActivePanel} />
-          <PortfolioMetric label="Collect" value={overview.totals.collect} busy={busy} tone="collect" panel="collect" activePanel={activePanel} onToggle={setActivePanel} />
+          <PortfolioMetric label="Open" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={togglePanel} />
+          <PortfolioMetric label="Pending" value={overview.totals.pending} busy={busy} tone="review" panel="review" activePanel={activePanel} onToggle={togglePanel} />
+          <PortfolioMetric label="Shopping" value={overview.totals.shopping} busy={busy} tone="shopping" panel="shopping" activePanel={activePanel} onToggle={togglePanel} />
+          <PortfolioMetric label="Collect" value={overview.totals.collect} busy={busy} tone="collect" panel="collect" activePanel={activePanel} onToggle={togglePanel} />
         </section>
 
-        {activePanel && (
+        <div className={`portfolio-drilldown-shell${activePanel ? " is-open" : ""}`} aria-hidden={!activePanel} inert={activePanel ? undefined : ""}>
           <PortfolioDrilldown
-            panel={activePanel}
+            panel={renderedPanel}
             properties={properties}
             units={units}
             items={items}
@@ -70,7 +76,7 @@ export function PortfolioHome({
             onItemChange={onItemChange}
             onDeleteItem={onDeleteItem}
           />
-        )}
+        </div>
       </div>
 
       {overview.continueProperty && (

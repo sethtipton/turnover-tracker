@@ -12,7 +12,7 @@ const PROPERTY_IMAGES = {
   "451 Park": imageFourFiftyOnePark,
   "441 Park": imageFourFortyOnePark,
   "1065/1067 Hudson": imageHudsonDuplex,
-  "4 Vine Ct": imageFourVine,
+  "4 Vine": imageFourVine,
   "124/126 N Mantua": imageOneTwentyFourMantua,
   "469 Carthage": imageFourSixtyNineCarthage,
   "458 W Main": imageFourFiftyEightMain,
