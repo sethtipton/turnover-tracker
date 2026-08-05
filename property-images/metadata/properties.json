@@ -58,5 +58,11 @@
     "address": "310 Park Ave, Kent, OH 44240",
     "rawImage": "../raw/310-park-ave.png",
     "processedImage": "../processed/310-park-ave.webp"
+  },
+  {
+    "id": "447-park-ave",
+    "address": "447 Park Ave, Kent, OH 44240",
+    "rawImage": "../raw/447-park-ave.png",
+    "processedImage": "../processed/447-park-ave.webp"
   }
 ]

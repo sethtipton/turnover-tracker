@@ -467,13 +467,14 @@ from public.workspaces workspace
 cross join (values
   ('451 Park', 1),
   ('441 Park', 2),
-  ('1065/1067 Hudson', 3),
-  ('4 Vine', 4),
-  ('124/126 N Mantua', 5),
-  ('469 Carthage', 6),
-  ('458 W Main', 7),
-  ('133 S Pearl', 8),
-  ('310 Park', 9)
+  ('447 Park', 3),
+  ('1065/1067 Hudson', 4),
+  ('4 Vine', 5),
+  ('124/126 N Mantua', 6),
+  ('469 Carthage', 7),
+  ('458 W Main', 8),
+  ('133 S Pearl', 9),
+  ('310 Park', 10)
 ) as seed(name, sort_order)
 where workspace.name = 'Tipton Rentals'
 on conflict (workspace_id, name) do update set sort_order = excluded.sort_order;
@@ -487,6 +488,7 @@ join (values
   ('451 Park', 'DOWN', 2),
   ('441 Park', 'UP', 1),
   ('441 Park', 'DOWN', 2),
+  ('447 Park', 'Main Unit', 1),
   ('1065/1067 Hudson', '1065', 1),
   ('1065/1067 Hudson', '1067', 2),
   ('4 Vine', 'Main Unit', 1),

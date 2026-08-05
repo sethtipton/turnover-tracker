@@ -141,5 +141,16 @@
     "finalDimensions": { "width": 1024, "height": 768 },
     "outputPath": "../processed/310-park-ave.webp",
     "notes": "Exact Maps result confirmed as the Bell Tower Brewing building. October 2020 panorama position is labeled 314 Park Ave; parked cars and a tree partly obstruct the building."
+  },
+  {
+    "id": "447-park-ave",
+    "address": "447 Park Ave, Kent, OH 44240",
+    "status": "complete",
+    "streetViewAvailable": true,
+    "rawDimensions": { "width": 1280, "height": 720 },
+    "crop": { "left": 280, "top": 60, "width": 880, "height": 660 },
+    "finalDimensions": { "width": 1024, "height": 768 },
+    "outputPath": "../processed/447-park-ave.webp",
+    "notes": "Exact Maps result confirmed. The May 2019 panorama position is labeled 444 Park Ave across the street; the view centers the white cottage at 447 Park Ave. Mature trees and overhead utility lines are visible."
   }
 ]
