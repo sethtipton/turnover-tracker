@@ -3,7 +3,6 @@ import {
   AlertCircle,
   ArrowRight,
   Building2,
-  CheckCircle2,
   ClipboardCheck,
   ShieldCheck,
   ShoppingCart,
@@ -17,7 +16,6 @@ import {
 import { getScopePath } from "../lib/routing";
 
 export function PortfolioHome({
-  displayName,
   properties,
   units,
   items,
@@ -42,8 +40,8 @@ export function PortfolioHome({
 
   if (properties.length === 0 && !busy) {
     return (
-      <section className="portfolio-home portfolio-empty" aria-labelledby="portfolio-title">
-        <h2 id="portfolio-title">No properties available</h2>
+      <section className="portfolio-home portfolio-empty" aria-label="Portfolio">
+        <h2>No properties available</h2>
         <p>Your account does not currently have access to a property.</p>
       </section>
     );
@@ -51,12 +49,6 @@ export function PortfolioHome({
 
   return (
     <div className="portfolio-home" aria-busy={busy}>
-      <header className="portfolio-intro">
-        <h2 id="portfolio-title">
-          {getPossessiveName(displayName)} {properties.length} {properties.length === 1 ? "Property" : "Properties"}
-        </h2>
-      </header>
-
       <div className="portfolio-workspace">
         <section className="portfolio-summary" aria-label="Portfolio work summary">
           <PortfolioMetric label="Open" value={overview.totals.openTasks} busy={busy} panel="tasks" activePanel={activePanel} onToggle={togglePanel} />
@@ -87,13 +79,7 @@ export function PortfolioHome({
         />
       )}
 
-      <section className="property-directory" aria-labelledby="property-directory-title">
-        <div className="directory-heading">
-          <div>
-            <p className="eyebrow">Portfolio directory</p>
-            <h2 id="property-directory-title">All properties</h2>
-          </div>
-        </div>
+      <section className="property-directory" aria-label="All properties">
         <ul className="property-grid" role="list">
           {overview.properties.map((summary) => (
             <li key={summary.property.id}>
@@ -109,10 +95,6 @@ export function PortfolioHome({
       </section>
     </div>
   );
-}
-
-function getPossessiveName(name) {
-  return name.endsWith("s") ? `${name}'` : `${name}'s`;
 }
 
 function getScopeButtonLabel(scope) {
@@ -165,7 +147,6 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
 
 function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
   const { property, scopes, done, total, open, shopping } = summary;
-  const status = getPropertyStatus(summary, busy);
 
   return (
     <article className={isOwnerAccess ? "property-card owner-access" : "property-card"}>
@@ -178,15 +159,9 @@ function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
           <h3 style={{ viewTransitionName: getPropertyTitleTransitionName(property.id) }}>
             {property.name}
           </h3>
-          {isOwnerAccess ? (
+          {isOwnerAccess && (
             <span className="property-owner-access" aria-label="Available through workspace owner access">
               <ShieldCheck size={14} aria-hidden="true" /> Admin access
-            </span>
-          ) : status && (
-            <span className={`property-state property-state-${status.tone}`}>
-              {status.tone === "done" && <CheckCircle2 size={14} aria-hidden="true" />}
-              {status.tone === "review" && <AlertCircle size={14} aria-hidden="true" />}
-              {status.label}
             </span>
           )}
         </div>
@@ -207,10 +182,23 @@ function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
               onOpenScope={onOpenScope}
             >
               <span className="property-scope-label">{getScopeButtonLabel(scope)}</span>
-              {scope.pending > 0 && (
-                <span className="property-state property-state-review">
-                  <AlertCircle size={14} aria-hidden="true" />
-                  {scope.pending} to review
+              {(scope.open > 0 || scope.pending > 0 || scope.listed) && (
+                <span className="property-scope-states">
+                  {scope.open > 0 && (
+                    <span className="property-state property-state-open">
+                      {scope.open} open
+                    </span>
+                  )}
+                  {scope.pending > 0 && (
+                    <span className="property-state property-state-review">
+                      {scope.pending} to review
+                    </span>
+                  )}
+                  {scope.listed && (
+                    <span className="property-state property-state-listed">
+                      Listed
+                    </span>
+                  )}
                 </span>
               )}
               <ArrowRight className="property-scope-arrow" size={16} aria-hidden="true" />
@@ -310,18 +298,8 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
     const latestTimestamp = propertyActivity?.created_at || latestItem?.updated_at || null;
     const propertyUnits = units.filter((unit) => unit.property_id === property.id);
     const scopes = [
-      {
-        unit: null,
-        label: "Whole Property",
-        pending: propertyItems.filter((item) => !item.unit_id && item.status === "pending-review").length,
-      },
-      ...propertyUnits.map((unit) => ({
-        unit,
-        label: unit.name,
-        pending: propertyItems.filter((item) => (
-          item.unit_id === unit.id && item.status === "pending-review"
-        )).length,
-      })),
+      buildScopeSummary(null, "Whole Property", propertyItems),
+      ...propertyUnits.map((unit) => buildScopeSummary(unit, unit.name, propertyItems)),
     ];
     const continueUnit = propertyActivity?.unit_id
       ? propertyUnits.find((unit) => unit.id === propertyActivity.unit_id) || null
@@ -337,7 +315,7 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
       done,
       total,
       progress: total > 0 ? Math.round((done / total) * 100) : 0,
-      open: propertyItems.filter((item) => item.status === "approved").length,
+      open: propertyItems.filter((item) => item.kind === "task" && item.status === "approved").length,
       pending: propertyItems.filter((item) => item.status === "pending-review").length,
       shopping: propertyItems.filter((item) => (
         item.kind === "material" && item.material_type === "shopping" && item.status !== "done"
@@ -372,11 +350,17 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
   };
 }
 
-function getPropertyStatus(summary, busy) {
-  if (busy) return { tone: "loading", label: "Loading" };
-  if (summary.open > 0) return { tone: "open", label: `${summary.open} open` };
-  if (summary.total > 0 && summary.done === summary.total) return { tone: "done", label: "All done" };
-  return null;
+function buildScopeSummary(unit, label, propertyItems) {
+  const scopeItems = propertyItems.filter((item) => (unit ? item.unit_id === unit.id : !item.unit_id));
+  const listed = Boolean(unit?.listing_published && ["available", "coming-soon"].includes(unit.listing_status));
+
+  return {
+    unit,
+    label,
+    open: scopeItems.filter((item) => item.kind === "task" && item.status === "approved").length,
+    pending: scopeItems.filter((item) => item.status === "pending-review").length,
+    listed,
+  };
 }
 
 function getPropertyMarker(name) {

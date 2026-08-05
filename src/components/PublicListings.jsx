@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Home,
   Landmark,
+  LoaderCircle,
   MapPin,
   Maximize,
   Save,
@@ -44,7 +45,7 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
   return (
     <>
       <main className="public-site" id="main-content" tabIndex="-1">
-        <PublicHeader />
+        <PublicHeader showDirectoryHeading={!isListingRoute && !isPropertyRoute} />
         {error ? (
           <section className="public-empty"><h1>Listings are unavailable</h1><p>{error}</p></section>
         ) : busy && (isListingRoute || isPropertyRoute) ? (
@@ -62,7 +63,7 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
   );
 }
 
-export function ListingWorkspace({ property, units, selectedUnit, view, busy, onSaveProperty, onSaveUnit, animated = false }) {
+export function ListingWorkspace({ property, units, selectedUnit, view, busy, onSaveProperty, onSaveUnit, onSuggestListingField, animated = false }) {
   const propertyUnits = units.filter((unit) => unit.property_id === property.id);
   const displayUnit = selectedUnit || (propertyUnits.length === 1 ? propertyUnits[0] : null);
   const listings = propertyUnits.map((unit) => createListingPreview(property, unit));
@@ -79,6 +80,7 @@ export function ListingWorkspace({ property, units, selectedUnit, view, busy, on
           busy={busy}
           onSaveProperty={onSaveProperty}
           onSaveUnit={onSaveUnit}
+          onSuggestListingField={onSuggestListingField}
         />
       ) : displayListing ? (
         <ListingDetail listing={displayListing} preview />
@@ -105,12 +107,15 @@ export function ListingViewSwitch({ view, onViewChange }) {
   );
 }
 
-function PublicHeader() {
+function PublicHeader({ showDirectoryHeading = false }) {
   return (
-    <header className="public-header">
+    <header className={`public-header${showDirectoryHeading ? " has-header-subtitle" : ""}`}>
       <a className="public-brand" href={getPublicListingPath("")}>
-        <Building2 size={22} aria-hidden="true" />
-        <span>Tree City Rentals</span>
+        <span className="public-brand-mark" aria-hidden="true"><Building2 strokeWidth={1.6} /></span>
+        <div className="public-brand-content">
+          <h1 className="header-brand-title">Tree City Rentals</h1>
+          {showDirectoryHeading && <h2>Homes near Kent State University</h2>}
+        </div>
       </a>
     </header>
   );
@@ -120,9 +125,7 @@ function PublicListingDirectory({ listings, busy }) {
   return (
     <section className="public-directory" aria-busy={busy}>
       <header className="public-directory-intro">
-        <p className="public-kicker">Kent, Ohio</p>
-        <h1>Homes near Kent State University</h1>
-        <p>Explore current rentals from Tree City Rentals.</p>
+        <p>Browse available and coming-soon homes near Kent State, with clear details to help you find the right place to call home.</p>
       </header>
       {busy ? (
         <p className="public-loading">Loading available homes...</p>
@@ -181,6 +184,7 @@ export function ListingDetail({ listing, preview = false }) {
     listing.neighborhood,
   ].some((value) => value !== null && value !== undefined && value !== "");
   const imageSrc = getPropertyImageBySlug(listing.property_slug);
+  const isLiveListing = isPublicListing(listing);
 
   return (
     <article className="public-listing-detail">
@@ -189,6 +193,11 @@ export function ListingDetail({ listing, preview = false }) {
         {imageSrc && (
           <div className="public-listing-hero-media">
             <img src={imageSrc} alt={`Exterior of ${listing.property_name}`} fetchPriority="high" />
+            {preview && isLiveListing && (
+              <span className="listing-live-overlay">
+                Live on Tree City Rentals as {getListingStatusLabel(listing.listing_status)}.
+              </span>
+            )}
           </div>
         )}
         <div className="public-listing-hero-content">
@@ -261,15 +270,11 @@ function ListingCard({ listing, preview = false }) {
   );
 }
 
-function ListingEditor({ property, units, busy, onSaveProperty, onSaveUnit }) {
+function ListingEditor({ property, units, busy, onSaveProperty, onSaveUnit, onSuggestListingField }) {
   return (
     <section className="listing-editor" aria-label="Edit listing">
-      <header>
-        <p className="public-kicker">Listing administration</p>
-        <h2>Edit listing details</h2>
-      </header>
       <PropertyEditor property={property} busy={busy} onSave={onSaveProperty} />
-      {units.map((unit) => <UnitEditor key={unit.id} unit={unit} busy={busy} onSave={onSaveUnit} />)}
+      {units.map((unit) => <UnitEditor key={unit.id} unit={unit} busy={busy} onSave={onSaveUnit} onSuggestListingField={onSuggestListingField} />)}
     </section>
   );
 }
@@ -291,7 +296,7 @@ function PropertyEditor({ property, busy, onSave }) {
   return (
     <form className="listing-edit-panel" onSubmit={submit}>
       <div className="listing-edit-heading"><h3>Shared property information</h3><button type="submit" disabled={busy}><Save size={17} aria-hidden="true" /> Save property</button></div>
-      <details open>
+      <details>
         <summary><span>Property basics</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
           <Field label="Public property name" name="public_name" value={form.public_name} onChange={change} />
@@ -327,8 +332,9 @@ function PropertyEditor({ property, busy, onSave }) {
   );
 }
 
-function UnitEditor({ unit, busy, onSave }) {
+function UnitEditor({ unit, busy, onSave, onSuggestListingField }) {
   const [form, setForm] = useState(toUnitForm(unit));
+  const [suggestingField, setSuggestingField] = useState("");
   useEffect(() => setForm(toUnitForm(unit)), [unit]);
 
   function change(event) {
@@ -350,15 +356,30 @@ function UnitEditor({ unit, busy, onSave }) {
     });
   }
 
+  async function suggest(field) {
+    if (!onSuggestListingField || suggestingField || busy) return;
+
+    setSuggestingField(field);
+    try {
+      const result = await onSuggestListingField(unit.id, field);
+      const suggestion = typeof result?.suggestion === "string" ? result.suggestion.trim() : "";
+      if (suggestion) setForm((current) => ({ ...current, [field]: suggestion }));
+    } catch {
+      // The shared status announcer reports suggestion failures.
+    } finally {
+      setSuggestingField("");
+    }
+  }
+
   return (
     <form className="listing-edit-panel" onSubmit={submit}>
       <div className="listing-edit-heading"><h3>{unit.name} listing</h3><button type="submit" disabled={busy}><Save size={17} aria-hidden="true" /> Save listing</button></div>
-      <details open>
+      <details>
         <summary><span>Publishing and address</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
           <label className="listing-publish-toggle"><input type="checkbox" name="listing_published" checked={form.listing_published} onChange={change} /> <span>Publish this listing</span></label>
           <SelectField label="Availability" name="listing_status" value={form.listing_status} onChange={change} options={LISTING_STATUS_OPTIONS} />
-          <Field label="Listing headline" name="listing_headline" value={form.listing_headline} onChange={change} />
+          <SuggestionField label="Listing headline" name="listing_headline" value={form.listing_headline} onChange={change} onSuggest={() => suggest("listing_headline")} busy={suggestingField === "listing_headline"} />
           <Field label="Unit number" name="unit_number" value={form.unit_number} onChange={change} />
           <SelectField label="Address visibility" name="address_visibility" value={form.address_visibility} onChange={change} options={ADDRESS_VISIBILITY_OPTIONS} />
         </div>
@@ -380,8 +401,8 @@ function UnitEditor({ unit, busy, onSave }) {
       <details>
         <summary><span>Description and amenities</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
-          <label className="form-field full-width"><span>Public listing description</span><textarea name="listing_description" rows="5" value={form.listing_description} onChange={change} /></label>
-          <label className="form-field full-width"><span>Amenities <span className="optional-label">one per line</span></span><textarea name="amenities" rows="4" value={form.amenities} onChange={change} /></label>
+          <SuggestionField label="Public listing description" name="listing_description" value={form.listing_description} onChange={change} onSuggest={() => suggest("listing_description")} busy={suggestingField === "listing_description"} multiline rows="5" />
+          <SuggestionField label="Amenities" hint="one per line" name="amenities" value={form.amenities} onChange={change} onSuggest={() => suggest("amenities")} busy={suggestingField === "amenities"} multiline rows="4" />
         </div>
       </details>
     </form>
@@ -390,6 +411,33 @@ function UnitEditor({ unit, busy, onSave }) {
 
 function Field({ label, name, value, onChange, type = "text", ...inputProps }) {
   return <label className="form-field"><span>{label}</span><input name={name} type={type} value={value} onChange={onChange} {...inputProps} /></label>;
+}
+
+function SuggestionField({ label, hint, name, value, onChange, onSuggest, busy, multiline = false, ...inputProps }) {
+  const fieldId = `listing-${name}`;
+
+  return (
+    <div className="form-field full-width suggestion-field">
+      <div className="suggestion-field-label">
+        <label htmlFor={fieldId}>{label}{hint && <> <span className="optional-label">{hint}</span></>}</label>
+        <button
+          className="field-suggestion-button"
+          type="button"
+          onClick={onSuggest}
+          disabled={busy}
+          aria-label={busy ? `Suggesting ${label}` : `Suggest ${label} with AI`}
+          title={busy ? `Suggesting ${label}` : `Suggest ${label} with AI`}
+        >
+          {busy ? <LoaderCircle className="field-suggestion-spinner" size={17} aria-hidden="true" /> : <Sparkles size={17} aria-hidden="true" />}
+        </button>
+      </div>
+      {multiline ? (
+        <textarea id={fieldId} name={name} value={value} onChange={onChange} {...inputProps} />
+      ) : (
+        <input id={fieldId} name={name} value={value} onChange={onChange} {...inputProps} />
+      )}
+    </div>
+  );
 }
 
 function SelectField({ label, name, value, onChange, options }) {
@@ -401,8 +449,12 @@ function Detail({ term, value, icon }) {
 }
 
 function PreviewNotice({ listings }) {
-  const unpublished = listings.some((listing) => !listing.listing_published || !["available", "coming-soon"].includes(listing.listing_status));
-  return unpublished ? <p className="listing-preview-notice">Preview only. This listing is not currently visible on the public site.</p> : <p className="listing-preview-notice live">Live on Tree City Rentals.</p>;
+  const unpublished = listings.some((listing) => !isPublicListing(listing));
+  return unpublished ? <p className="listing-preview-notice">Preview only. This listing is not currently visible on the public site.</p> : null;
+}
+
+function isPublicListing(listing) {
+  return listing.listing_published && ["available", "coming-soon"].includes(listing.listing_status);
 }
 
 function PublicNotFound() {

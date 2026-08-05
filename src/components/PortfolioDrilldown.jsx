@@ -17,14 +17,14 @@ const PANEL_CONFIG = {
   },
   shopping: {
     title: "Shopping",
-    combinedTitle: "Shopping List for all Properties",
+    combinedTitle: "Combined Shopping List",
     empty: "No shopping items right now.",
     matches: (item) => item.kind === "material" && item.material_type === "shopping" && item.status !== "done",
     action: { label: "Mark done", status: "done" },
   },
   collect: {
     title: "Collect",
-    combinedTitle: "Collect / Bring for all Properties",
+    combinedTitle: "Combined Collect / Bring List",
     empty: "No collect or bring items right now.",
     matches: (item) => item.kind === "material" && item.material_type === "collect" && item.status !== "done",
     action: { label: "Mark done", status: "done" },
@@ -46,29 +46,19 @@ export function PortfolioDrilldown({
     () => getPortfolioGroups(properties, units, items, config.matches),
     [config, items, properties, units],
   );
-  const count = groups.reduce((total, group) => total + group.items.length, 0);
 
   return (
-    <section className={`portfolio-drilldown portfolio-drilldown-${panel}`} id="portfolio-work-drilldown" aria-labelledby="portfolio-drilldown-title">
-      <div className="portfolio-drilldown-heading">
-        <div>
-          <h2 id="portfolio-drilldown-title">{config.title}</h2>
-        </div>
-        <span className="portfolio-drilldown-count">{busy ? "Updating" : `${count} item${count === 1 ? "" : "s"}`}</span>
-      </div>
+    <section className={`portfolio-drilldown portfolio-drilldown-${panel}`} id="portfolio-work-drilldown" aria-label={`${config.title} items`}>
       {groups.length === 0 ? (
         <p className="empty">{config.empty}</p>
       ) : (
         <>
-          {config.combinedTitle && (
-            <ShoppingRunList panel={panel} title={config.combinedTitle} groups={groups} busy={busy} onItemChange={onItemChange} />
-          )}
           <div className="portfolio-drilldown-groups">
             {groups.map((group) => (
               <PropertyItemGroup
                 key={group.property.id}
                 group={group}
-                collapsible={panel === "tasks" || panel === "shopping" || panel === "collect"}
+                collapsible={panel === "tasks" || panel === "review" || panel === "shopping" || panel === "collect"}
                 action={config.action}
                 busy={busy}
                 onOpenScope={onOpenScope}
@@ -77,6 +67,9 @@ export function PortfolioDrilldown({
               />
             ))}
           </div>
+          {config.combinedTitle && (
+            <ShoppingRunList panel={panel} title={config.combinedTitle} groups={groups} busy={busy} onItemChange={onItemChange} />
+          )}
         </>
       )}
     </section>
@@ -112,32 +105,38 @@ function ShoppingRunList({ panel, title, groups, busy, onItemChange }) {
           <strong>{entries.length}</strong>
         </button>
       </h3>
-      <ul className="shopping-run-list" id={`${panel}-run-items`} role="list" hidden={!isOpen}>
-        {entries.map(({ item, property, unit }) => (
-          <li key={item.id}>
-            <label className="shopping-run-item">
-              <input
-                type="checkbox"
-                checked={completingId === item.id}
-                disabled={busy || Boolean(completingId)}
-                onChange={() => markDone(item)}
-                aria-label={`Mark ${item.title} done`}
-              />
-              <span className="shopping-run-copy">
-                <strong>{item.title}</strong>
-                <span>{property.name} · {unit?.name || "Property"}</span>
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
+      <div className="shopping-run-content" id={`${panel}-run-items`} hidden={!isOpen}>
+        <p className="shopping-run-instructions">Use this while shopping. Click to mark done.</p>
+        <ul className="shopping-run-list" role="list">
+          {entries.map(({ item, property, unit }) => (
+            <li key={item.id}>
+              <label className="shopping-run-item">
+                <input
+                  type="checkbox"
+                  checked={completingId === item.id}
+                  disabled={busy || Boolean(completingId)}
+                  onChange={() => markDone(item)}
+                  aria-label={`Mark ${item.title} done`}
+                />
+                <span className="shopping-run-copy">
+                  <strong>{item.title}</strong>
+                  <span>{property.name} · {unit?.name || "Property"}</span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
 
 function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const contentId = `portfolio-group-items-${group.property.id}`;
+  const scopeGroups = group.units.length > 1 || group.items.some(({ unit }) => !unit)
+    ? getScopeGroups(group)
+    : null;
 
   return (
     <section className={`portfolio-item-group${collapsible && !isOpen ? " is-collapsed" : ""}`} aria-labelledby={`portfolio-group-${group.property.id}`}>
@@ -156,32 +155,66 @@ function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onIt
             </button>
           </h3>
         ) : (
-          <ScopeLink property={group.property} onOpenScope={onOpenScope}>
-            <h3 id={`portfolio-group-${group.property.id}`}>{group.property.name}</h3>
-          </ScopeLink>
+          <h3 id={`portfolio-group-${group.property.id}`}>{group.property.name}</h3>
         )}
+        <ScopeLink className="portfolio-item-group-link" property={group.property} onOpenScope={onOpenScope} aria-label={`Open ${group.property.name}`}>
+          <ArrowRight size={17} aria-hidden="true" />
+        </ScopeLink>
         <span>{group.items.length}</span>
       </div>
-      <ul className="portfolio-item-list" id={contentId} role="list" hidden={collapsible && !isOpen}>
-        {group.items.map(({ item, unit }) => (
-          <PortfolioItemRow
-            key={item.id}
-            item={item}
-            property={group.property}
-            unit={unit}
-            action={action}
-            busy={busy}
-            onOpenScope={onOpenScope}
-            onItemChange={onItemChange}
-            onDeleteItem={onDeleteItem}
-          />
-        ))}
-      </ul>
+      {scopeGroups ? (
+        <div className="portfolio-unit-groups" id={contentId} hidden={collapsible && !isOpen}>
+          {scopeGroups.map((scopeGroup) => (
+            <section className="portfolio-unit-group" key={scopeGroup.id} aria-labelledby={`${contentId}-${scopeGroup.id}`}>
+              <h4 id={`${contentId}-${scopeGroup.id}`}>
+                <ScopeLink className="portfolio-unit-heading" property={group.property} unit={scopeGroup.unit} onOpenScope={onOpenScope}>
+                  <span>{scopeGroup.label}</span>
+                  <ArrowRight size={16} aria-hidden="true" />
+                </ScopeLink>
+              </h4>
+              <PortfolioItemList
+                entries={scopeGroup.items}
+                action={action}
+                busy={busy}
+                onItemChange={onItemChange}
+                onDeleteItem={onDeleteItem}
+              />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <PortfolioItemList
+          id={contentId}
+          hidden={collapsible && !isOpen}
+          entries={group.items}
+          action={action}
+          busy={busy}
+          onItemChange={onItemChange}
+          onDeleteItem={onDeleteItem}
+        />
+      )}
     </section>
   );
 }
 
-function PortfolioItemRow({ item, property, unit, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
+function PortfolioItemList({ id, hidden, entries, action, busy, onItemChange, onDeleteItem }) {
+  return (
+    <ul className="portfolio-item-list" id={id} role="list" hidden={hidden}>
+      {entries.map(({ item }) => (
+        <PortfolioItemRow
+          key={item.id}
+          item={item}
+          action={action}
+          busy={busy}
+          onItemChange={onItemChange}
+          onDeleteItem={onDeleteItem}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function PortfolioItemRow({ item, action, busy, onItemChange, onDeleteItem }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [working, setWorking] = useState(false);
@@ -216,10 +249,6 @@ function PortfolioItemRow({ item, property, unit, action, busy, onOpenScope, onI
 
   return (
     <li className="portfolio-item-row">
-      <ScopeLink className="portfolio-item-scope" property={property} unit={unit} onOpenScope={onOpenScope}>
-        <span>{unit?.name || "Property"}</span>
-        <ArrowRight size={15} aria-hidden="true" />
-      </ScopeLink>
       <div className="portfolio-item-copy">
         {editing ? (
           <form className="portfolio-item-rename" onSubmit={saveTitle}>
@@ -261,7 +290,7 @@ function PortfolioItemRow({ item, property, unit, action, busy, onOpenScope, onI
   );
 }
 
-function ScopeLink({ property, unit, onOpenScope, className, children }) {
+function ScopeLink({ property, unit, onOpenScope, className, children, ...linkProps }) {
   function handleClick(event) {
     if (
       event.defaultPrevented
@@ -276,20 +305,42 @@ function ScopeLink({ property, unit, onOpenScope, className, children }) {
     onOpenScope(property.id, unit?.id || "");
   }
 
-  return <a className={className} href={getScopePath(property, unit)} onClick={handleClick}>{children}</a>;
+  return <a className={className} href={getScopePath(property, unit)} onClick={handleClick} {...linkProps}>{children}</a>;
 }
 
 function getPortfolioGroups(properties, units, items, matches) {
   const unitById = new Map(units.map((unit) => [unit.id, unit]));
 
   return properties
-    .map((property) => ({
-      property,
-      items: items
-        .filter((item) => item.property_id === property.id && matches(item))
-        .sort((left, right) => new Date(right.updated_at) - new Date(left.updated_at))
-        .map((item) => ({ item, unit: unitById.get(item.unit_id) || null })),
-    }))
+    .map((property) => {
+      const propertyUnits = units
+        .filter((unit) => unit.property_id === property.id)
+        .sort((left, right) => left.sort_order - right.sort_order || left.name.localeCompare(right.name));
+
+      return {
+        property,
+        units: propertyUnits,
+        items: items
+          .filter((item) => item.property_id === property.id && matches(item))
+          .sort((left, right) => new Date(right.updated_at) - new Date(left.updated_at))
+          .map((item) => ({ item, unit: unitById.get(item.unit_id) || null })),
+      };
+    })
     .filter((group) => group.items.length > 0)
     .sort((left, right) => right.items.length - left.items.length || left.property.name.localeCompare(right.property.name));
+}
+
+function getScopeGroups(group) {
+  const propertyItems = group.items.filter(({ unit }) => !unit);
+  const unitGroups = group.units.map((unit) => ({
+    id: `unit-${unit.id}`,
+    label: unit.name,
+    unit,
+    items: group.items.filter((entry) => entry.unit?.id === unit.id),
+  }));
+
+  return [
+    ...(propertyItems.length > 0 ? [{ id: "property", label: "Property", unit: null, items: propertyItems }] : []),
+    ...unitGroups.filter((group) => group.items.length > 0),
+  ];
 }

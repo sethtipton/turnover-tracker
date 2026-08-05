@@ -22,7 +22,7 @@ import {
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
 import { usePortfolioOverview } from "./hooks/usePortfolioOverview";
 import { useScopeItems } from "./hooks/useScopeItems";
-import { draftTasksFromDictation } from "./lib/ai";
+import { draftListingField, draftTasksFromDictation } from "./lib/ai";
 import {
   addItem,
   getAttachmentUrl,
@@ -56,6 +56,7 @@ const emptyDraft = {
 function App() {
   const [session, setSession] = useState(undefined);
   const [workspace, setWorkspace] = useState(null);
+  const [workspaceUserId, setWorkspaceUserId] = useState("");
   const [properties, setProperties] = useState([]);
   const [units, setUnits] = useState([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
@@ -77,7 +78,7 @@ function App() {
   const [listingView, setListingView] = useState("tasks");
   const [listingBusy, setListingBusy] = useState(false);
   const [publicListings, setPublicListings] = useState([]);
-  const [publicListingsBusy, setPublicListingsBusy] = useState(false);
+  const [publicListingsBusy, setPublicListingsBusy] = useState(true);
   const [publicListingsError, setPublicListingsError] = useState("");
 
   const {
@@ -127,6 +128,8 @@ function App() {
   });
 
   const busy = itemsBusy || dictationBusy || listingBusy;
+  const sessionUserId = session?.user?.id || "";
+  const workspaceReady = Boolean(sessionUserId && workspaceUserId === sessionUserId);
   const userEmail = session?.user?.email?.toLowerCase();
   const userDisplayName = getUserDisplayName(session?.user);
   const isWorkspaceOwner = workspaceMembers.some((member) => (
@@ -208,25 +211,38 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!sessionUserId) {
+      setWorkspace(null);
+      setWorkspaceUserId("");
+      setProperties([]);
+      setUnits([]);
+      setSelectedPropertyId("");
+      setSelectedUnitId("");
+      return undefined;
+    }
+
+    let isMounted = true;
 
     async function loadInitialData() {
       setAccessError("");
+      setWorkspaceUserId("");
       try {
         const workspaceData = await loadWorkspace();
         const [propertyData, unitData, memberData, visibilityData] = await Promise.all([
           loadProperties(workspaceData.id),
           loadUnits(workspaceData.id),
           loadWorkspaceMembers(workspaceData.id),
-          loadPropertyVisibilityPreferences(workspaceData.id, session.user.id),
+          loadPropertyVisibilityPreferences(workspaceData.id, sessionUserId),
         ]);
         const isOwner = memberData.some((member) => (
-          member.email === session.user.email?.toLowerCase() && member.role === "owner"
+          member.email === userEmail && member.role === "owner"
         ));
         const propertyMemberData = isOwner
           ? await loadPropertyMembers(workspaceData.id)
           : [];
         const routeScope = getScopeFromCurrentPath(propertyData, unitData);
+        if (!isMounted) return;
+
         setWorkspace(workspaceData);
         setProperties(propertyData);
         setUnits(unitData);
@@ -235,6 +251,7 @@ function App() {
         setPropertyVisibility(visibilityData);
         setSelectedPropertyId(routeScope.propertyId);
         setSelectedUnitId(routeScope.unitId);
+        setWorkspaceUserId(sessionUserId);
 
         if (routeScope.propertyId) {
           updateScopePath(
@@ -244,12 +261,15 @@ function App() {
           );
         }
       } catch (error) {
-        setAccessError(error.message);
+        if (isMounted) setAccessError(error.message);
       }
     }
 
     loadInitialData();
-  }, [session]);
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionUserId, userEmail]);
 
   useEffect(() => {
     function handlePopState() {
@@ -436,6 +456,34 @@ function App() {
     }
   }
 
+  async function handleSuggestListingField(unitId, field) {
+    if (!selectedProperty) throw new Error("Select a property before drafting listing copy.");
+
+    setListingBusy(true);
+    try {
+      const result = await draftListingField({
+        propertyId: selectedProperty.id,
+        unitId,
+        field,
+      });
+      if (typeof result?.suggestion !== "string" || !result.suggestion.trim()) {
+        throw new Error("AI returned an empty suggestion.");
+      }
+      const fieldLabel = {
+        listing_headline: "headline",
+        listing_description: "description",
+        amenities: "amenities",
+      }[field] || "listing field";
+      setMessage(`AI suggested a ${fieldLabel}. Review it, then save the listing when ready.`);
+      return result;
+    } catch (error) {
+      setMessage(`AI could not suggest listing copy: ${error.message}`);
+      throw error;
+    } finally {
+      setListingBusy(false);
+    }
+  }
+
   function handleListingViewChange(nextView) {
     if (nextView === listingView) return;
     setListingView(nextView);
@@ -568,9 +616,10 @@ function App() {
   }
 
   if (!isSupabaseConfigured) return <LandingPage onSignIn={signInWithGoogle} setupMissing />;
-  if (session === undefined) return <PublicSite listings={[]} busy error="" onSignIn={signInWithGoogle} />;
+  if (session === undefined) return <AppBootScreen />;
   if (!session) return <PublicSite listings={publicListings} busy={publicListingsBusy} error={publicListingsError} onSignIn={signInWithGoogle} />;
   if (accessError) return <AccessGate email={userEmail} onSignOut={signOut} message={accessError} />;
+  if (!workspaceReady) return <AppBootScreen label="Loading workspace..." />;
 
   return (
     <>
@@ -579,12 +628,13 @@ function App() {
         <div className="workspace-top">
           <AppHeader
             property={peopleAccessOpen ? null : selectedProperty}
-            scopeTitle={peopleAccessOpen ? "People & Access" : selectedScopeTitle}
-            hasSelectedProperty={Boolean(selectedProperty) && !peopleAccessOpen}
-            isWorkspaceOwner={isWorkspaceOwner}
+            scopeTitle={peopleAccessOpen
+              ? "People & Access"
+              : selectedProperty
+                ? selectedUnit?.name || "Whole Property"
+                : getPortfolioTitle(userDisplayName, visibleProperties.length)}
             peopleAccessOpen={peopleAccessOpen}
-            onTogglePeopleAccess={handleTogglePeopleAccess}
-            scopeSelector={!peopleAccessOpen && !workMode && selectedProperty ? (
+            scopeSelector={!peopleAccessOpen && !workMode ? (
               <ScopeSelector
                 properties={selectorProperties}
                 units={units}
@@ -635,7 +685,6 @@ function App() {
             ) : !selectedProperty ? (
               <>
                 <PortfolioHome
-                  displayName={userDisplayName}
                   properties={visibleProperties}
                   units={units}
                   items={visiblePortfolioItems}
@@ -661,6 +710,7 @@ function App() {
                 busy={listingBusy}
                 onSaveProperty={handleSaveListingProperty}
                 onSaveUnit={handleSaveListingUnit}
+                onSuggestListingField={handleSuggestListingField}
                 animated
                 />
                 <StatusMessage message={message} />
@@ -718,8 +768,22 @@ function App() {
           </>
         )}
       </main>
-      <AppFooter authenticated onAuthAction={signOut} />
+      <AppFooter
+        authenticated
+        onAuthAction={signOut}
+        isWorkspaceOwner={isWorkspaceOwner}
+        peopleAccessOpen={peopleAccessOpen}
+        onTogglePeopleAccess={handleTogglePeopleAccess}
+      />
     </>
+  );
+}
+
+function AppBootScreen({ label = "Loading..." }) {
+  return (
+    <main className="app-boot-screen" id="main-content" tabIndex="-1">
+      <p role="status">{label}</p>
+    </main>
   );
 }
 
@@ -729,6 +793,11 @@ function getUserDisplayName(user) {
 
   const emailUsername = user?.email?.split("@")[0]?.trim();
   return emailUsername || "Signed-in user";
+}
+
+function getPortfolioTitle(name, propertyCount) {
+  const possessiveName = name.endsWith("s") ? `${name}'` : `${name}'s`;
+  return `${possessiveName} ${propertyCount} ${propertyCount === 1 ? "Property" : "Properties"}`;
 }
 
 export default App;

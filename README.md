@@ -54,7 +54,7 @@ Workspace access is stored in `public.workspace_members`. The initial Tipton Ren
 
 Do not put an OpenAI API key in any `VITE_` environment variable. Vite variables are bundled into the public browser app, so the key must stay server-side.
 
-The app uses a Supabase Edge Function at `supabase/functions/draft-tasks` to keep OpenAI calls server-side. It reads:
+The app uses Supabase Edge Functions at `supabase/functions/draft-tasks` and `supabase/functions/draft-listing-copy` to keep OpenAI calls server-side. They read:
 
 ```text
 SUPABASE_URL
@@ -76,7 +76,7 @@ For hosted Supabase:
 
 ```bash
 supabase secrets set OPENAI_API_KEY="your-real-key" OPENAI_MODEL="gpt-4.1-mini" OPENAI_TRANSCRIPTION_MODEL="gpt-4o-transcribe" --project-ref gholbnyvijfyqdwqgjan
-supabase functions deploy draft-tasks --project-ref gholbnyvijfyqdwqgjan
+supabase functions deploy draft-tasks draft-listing-copy --project-ref gholbnyvijfyqdwqgjan
 ```
 
 For GitHub-managed deployment, add these repository secrets in GitHub > Settings > Secrets and variables > Actions:
@@ -94,7 +94,7 @@ OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
 ```
 
-Then run the manual `Deploy Supabase Functions` workflow from the GitHub Actions tab. The function transcribes saved dictation audio, creates pending-review tasks/materials from the transcript, and stores the transcript on the original dictation item.
+Then run the manual `Deploy Supabase Functions` workflow from the GitHub Actions tab. `draft-tasks` transcribes saved dictation audio, creates pending-review tasks/materials from the transcript, and stores the transcript on the original dictation item. `draft-listing-copy` produces editable, fact-grounded suggestions for listing headlines, descriptions, and amenities; it never saves or publishes a listing.
 
 ## Deploy
 

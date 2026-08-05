@@ -1,4 +1,4 @@
-import { UsersRound } from "lucide-react";
+import { Building2 } from "lucide-react";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -8,51 +8,46 @@ import {
 export function AppHeader({
   property,
   scopeTitle,
-  hasSelectedProperty,
-  isWorkspaceOwner,
   peopleAccessOpen,
-  onTogglePeopleAccess,
   scopeSelector,
 }) {
   const propertyImage = getPropertyImage(property?.name);
+  const showBrandIdentity = !property && !peopleAccessOpen;
+  const hasHeaderVisual = Boolean(propertyImage) || showBrandIdentity;
+  const hasHeaderSubtitle = Boolean((property || showBrandIdentity) && scopeTitle);
+  const title = property?.name || (showBrandIdentity ? "Tree City Rentals" : scopeTitle || "Turnover Tracker");
   const headerClassName = [
     "app-header",
-    propertyImage && "has-property-image",
+    hasHeaderVisual && "has-header-visual",
+    showBrandIdentity && "has-brand-mark",
+    hasHeaderSubtitle && "has-header-subtitle",
     scopeSelector && "has-scope-selector",
   ].filter(Boolean).join(" ");
 
   return (
     <header className={headerClassName}>
-      {propertyImage && (
+      {propertyImage ? (
         <div
-          className="app-header-property-image"
+          className="app-header-visual"
           style={{ viewTransitionName: getPropertyImageTransitionName(property.id) }}
         >
           <img src={propertyImage} alt="" width="1024" height="768" />
         </div>
-      )}
+      ) : showBrandIdentity ? (
+        <div className="app-header-visual app-header-brand-mark" aria-hidden="true">
+          <Building2 strokeWidth={1.6} />
+        </div>
+      ) : null}
       <div className="app-header-identity">
         <h1
           id="app-title"
           tabIndex="-1"
           style={{ viewTransitionName: getPropertyTitleTransitionName(property?.id) }}
         >
-          {scopeTitle || "Turnover Tracker"}
+          {title}
         </h1>
+        {(property || showBrandIdentity) && scopeTitle && <h2>{scopeTitle}</h2>}
       </div>
-      {isWorkspaceOwner && !hasSelectedProperty && (
-        <div className="header-actions" aria-label="Workspace actions">
-          <button
-            className={peopleAccessOpen ? "people-access-button active" : "people-access-button"}
-            type="button"
-            onClick={onTogglePeopleAccess}
-            aria-pressed={peopleAccessOpen}
-          >
-            <UsersRound size={18} aria-hidden="true" />
-            <span className="action-label">People &amp; Access</span>
-          </button>
-        </div>
-      )}
       {scopeSelector}
     </header>
   );
