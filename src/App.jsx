@@ -13,7 +13,6 @@ import { ListingViewSwitch, ListingWorkspace, PublicSite } from "./components/Pu
 import { ReviewQueue } from "./components/ReviewQueue";
 import {
   DictationInbox,
-  FiltersBar,
   QuickAddPanel,
   ScopeSelector,
   StatusMessage,
@@ -64,6 +63,7 @@ function App() {
   const [draft, setDraft] = useState(emptyDraft);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [openRequests, setOpenRequests] = useState({ tasks: 0, shopping: 0, review: 0 });
   const [message, setMessage] = useState("");
   const [accessError, setAccessError] = useState("");
   const [mediaUrls, setMediaUrls] = useState({});
@@ -342,6 +342,22 @@ function App() {
     handleOpenScope(propertyId, "");
   }
 
+  function handleSummaryMetric(metric) {
+    setQuery("");
+
+    if (metric === "approved" || metric === "done") {
+      setStatusFilter(metric);
+      setOpenRequests((current) => ({ ...current, tasks: current.tasks + 1 }));
+      return;
+    }
+
+    setStatusFilter("all");
+    setOpenRequests((current) => ({
+      ...current,
+      [metric]: current[metric] + 1,
+    }));
+  }
+
   function handleUnitChange(unitId) {
     handleOpenScope(selectedPropertyId, unitId);
   }
@@ -492,7 +508,9 @@ function App() {
 
   async function handleAddItem(event) {
     event.preventDefault();
-    if (await addWork(draft)) setDraft(emptyDraft);
+    const added = await addWork(draft);
+    if (added) setDraft(emptyDraft);
+    return added;
   }
 
   async function handleDeleteItem(item) {
@@ -600,11 +618,11 @@ function App() {
       <div className="work-grid">
         {!compact && (
           <div className="materials-row">
-            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} />
             <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
           </div>
         )}
-        <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} />
+        <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} />
         {!compact && (
           <>
             <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
@@ -661,7 +679,7 @@ function App() {
               onSave={handleSavePropertyAccess}
               onSetPropertyVisibility={handleSetPropertyVisibility}
             />
-            <StatusMessage message={message} />
+            <StatusMessage message={message} onDismiss={setMessage} />
           </>
         ) : (
           <>
@@ -695,7 +713,7 @@ function App() {
                   onItemChange={handlePortfolioItemChange}
                   onDeleteItem={handleDeletePortfolioItem}
                 />
-                <StatusMessage message={message} />
+                <StatusMessage message={message} onDismiss={setMessage} />
               </>
             ) : null}
 
@@ -713,7 +731,7 @@ function App() {
                 onSuggestListingField={handleSuggestListingField}
                 animated
                 />
-                <StatusMessage message={message} />
+                <StatusMessage message={message} onDismiss={setMessage} />
               </>
             )}
 
@@ -730,6 +748,11 @@ function App() {
                   audioLevel={audioLevel}
                   onStartDictation={startDictation}
                   onStopDictation={stopDictation}
+                  query={query}
+                  statusFilter={statusFilter}
+                  onQueryChange={setQuery}
+                  onStatusChange={setStatusFilter}
+                  onMetricClick={handleSummaryMetric}
                 />
                 <ReviewQueue
                   items={reviewItems}
@@ -740,12 +763,7 @@ function App() {
                   onReject={handleRejectItem}
                   onDeleteAttachment={handleDeleteAttachment}
                   mediaUrls={mediaUrls}
-                />
-                <FiltersBar
-                  query={query}
-                  statusFilter={statusFilter}
-                  onQueryChange={setQuery}
-                  onStatusChange={setStatusFilter}
+                  openRequest={openRequests.review}
                 />
                 <DictationInbox
                   recordings={selectedScopeRecordings}
@@ -759,7 +777,7 @@ function App() {
                   onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                   onSubmit={handleAddItem}
                 />
-                <StatusMessage message={message} />
+                <StatusMessage message={message} onDismiss={setMessage} />
                 {renderWorkGrid(false)}
               </section>
             )}

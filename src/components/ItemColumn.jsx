@@ -16,11 +16,16 @@ export function ItemColumn({
   mediaUrls,
   forceOpen = false,
   compact = false,
+  openRequest = 0,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const panelId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-items`;
   const isOpen = forceOpen || !isCollapsed;
   const orderedItems = sortItemsForDisplay(items);
+
+  useEffect(() => {
+    if (openRequest > 0) setIsCollapsed(false);
+  }, [openRequest]);
 
   function handleStatusChange(item, status) {
     runCompletionTransition(() => onStatus(item, status), status === "done");

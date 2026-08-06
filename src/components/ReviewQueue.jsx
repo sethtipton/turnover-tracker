@@ -1,4 +1,5 @@
-import { Check, CheckCheck, ShoppingCart, Trash2, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, CheckCheck, ChevronDown, ShoppingCart, Trash2, Wrench } from "lucide-react";
 import { AttachmentList, EditableItem } from "./ItemColumn";
 
 export function ReviewQueue({
@@ -10,23 +11,37 @@ export function ReviewQueue({
   onReject,
   onDeleteAttachment,
   mediaUrls,
+  openRequest = 0,
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  useEffect(() => {
+    if (openRequest > 0) setIsCollapsed(false);
+  }, [openRequest]);
+
   if (items.length === 0) return null;
 
+  const isOpen = !isCollapsed;
+
   return (
-    <section className="panel review-queue" aria-labelledby="review-queue-title" aria-describedby="review-queue-description">
+    <section className={`panel review-queue${isOpen ? "" : " is-collapsed"}`} aria-labelledby="review-queue-title" aria-describedby={isOpen ? "review-queue-description" : undefined}>
       <div className="review-queue-header">
         <div>
           <p className="eyebrow">Needs a decision</p>
-          <h2 id="review-queue-title">Review Queue <span>{items.length}</span></h2>
-          <p id="review-queue-description">Check dictated work before it moves into the active lists.</p>
+          <h2 id="review-queue-title">
+            <button className="panel-toggle" type="button" aria-expanded={isOpen} aria-controls="review-queue-items" onClick={() => setIsCollapsed((current) => !current)}>
+              <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
+              Review Queue <span>{items.length}</span>
+            </button>
+          </h2>
+          {isOpen && <p id="review-queue-description">Check dictated work before it moves into the active lists.</p>}
         </div>
-        <button type="button" onClick={onApproveAll} disabled={busy}>
+        {isOpen && <button type="button" onClick={onApproveAll} disabled={busy}>
           <CheckCheck size={18} aria-hidden="true" />
           Approve all
-        </button>
+        </button>}
       </div>
-      <ul className="review-list" role="list">
+      <ul className="review-list" id="review-queue-items" role="list" hidden={!isOpen}>
         {items.map((item) => (
           <li className="review-card" key={item.id}>
             <div className="review-item-kind">

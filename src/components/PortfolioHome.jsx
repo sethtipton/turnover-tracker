@@ -105,7 +105,7 @@ function getScopeButtonLabel(scope) {
 }
 
 function ContinuePanel({ summary, busy, onOpenScope }) {
-  const { property, continueUnit, progress, done, total, open, pending } = summary;
+  const { property, continueUnit, progress, done, total, open, pending, latestActivity } = summary;
   const scopeLabel = continueUnit?.name || "Whole Property";
 
   return (
@@ -117,6 +117,11 @@ function ContinuePanel({ summary, busy, onOpenScope }) {
           <h2 id="continue-title">{property.name}</h2>
           <p className="continue-scope">{scopeLabel}</p>
         </div>
+        {latestActivity && (
+          <p className="continue-last-touched">
+            Last touched {formatRelativeTime(latestActivity.created_at)}{latestActivity.actor_email ? ` by ${formatActorName(latestActivity.actor_email)}` : ""}
+          </p>
+        )}
         <div className="continue-progress">
           <ProgressBar value={done} total={total} label={`${property.name} completion`} />
           <span>{total > 0 ? `${progress}% complete` : "Ready for a walkthrough"}</span>
@@ -150,29 +155,33 @@ function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
 
   return (
     <article className={isOwnerAccess ? "property-card owner-access" : "property-card"}>
-      <PropertyVisual
-        property={property}
-        transitionName={getPropertyImageTransitionName(property.id)}
-      />
+      <div className="property-card-media">
+        <PropertyVisual
+          property={property}
+          transitionName={getPropertyImageTransitionName(property.id)}
+        />
+        <div className="property-card-summary">
+          <div className="property-card-heading">
+            <h3 style={{ viewTransitionName: getPropertyTitleTransitionName(property.id) }}>
+              {property.name}
+            </h3>
+            {isOwnerAccess && (
+              <span className="property-owner-access" aria-label="Available through workspace owner access">
+                <ShieldCheck size={14} aria-hidden="true" /> Admin access
+              </span>
+            )}
+          </div>
+          <div className="property-progress-row">
+            {(busy || total > 0) && <span>{busy ? "Loading" : `${done}/${total}`}</span>}
+            <ProgressBar value={done} total={total} label={`${property.name} completion`} />
+          </div>
+          <div className="property-counts" aria-label={`${property.name} work counts`}>
+            <span><ClipboardCheck size={15} aria-hidden="true" /> {busy ? "-" : open} open</span>
+            <span><ShoppingCart size={15} aria-hidden="true" /> {busy ? "-" : shopping} shopping</span>
+          </div>
+        </div>
+      </div>
       <div className="property-card-body">
-        <div className="property-card-heading">
-          <h3 style={{ viewTransitionName: getPropertyTitleTransitionName(property.id) }}>
-            {property.name}
-          </h3>
-          {isOwnerAccess && (
-            <span className="property-owner-access" aria-label="Available through workspace owner access">
-              <ShieldCheck size={14} aria-hidden="true" /> Admin access
-            </span>
-          )}
-        </div>
-        <div className="property-progress-row">
-          {(busy || total > 0) && <span>{busy ? "Loading" : `${done}/${total}`}</span>}
-          <ProgressBar value={done} total={total} label={`${property.name} completion`} />
-        </div>
-        <div className="property-counts" aria-label={`${property.name} work counts`}>
-          <span><ClipboardCheck size={15} aria-hidden="true" /> {busy ? "-" : open} open</span>
-          <span><ShoppingCart size={15} aria-hidden="true" /> {busy ? "-" : shopping} shopping</span>
-        </div>
         <nav className="property-scopes" aria-label={`Open ${property.name} scope`}>
           {scopes.map((scope) => (
             <ScopeLink
@@ -182,16 +191,26 @@ function PropertyCard({ summary, busy, isOwnerAccess, onOpenScope }) {
               onOpenScope={onOpenScope}
             >
               <span className="property-scope-label">{getScopeButtonLabel(scope)}</span>
-              {(scope.open > 0 || scope.pending > 0 || scope.listed) && (
+              {(scope.open > 0 || scope.pending > 0 || scope.shopping > 0 || scope.collect > 0 || scope.listed) && (
                 <span className="property-scope-states">
                   {scope.open > 0 && (
-                    <span className="property-state property-state-open">
-                      {scope.open} open
+                    <span className="property-state property-state-open" aria-label={`${scope.open} open tasks`}>
+                      {scope.open}
                     </span>
                   )}
                   {scope.pending > 0 && (
-                    <span className="property-state property-state-review">
-                      {scope.pending} to review
+                    <span className="property-state property-state-review" aria-label={`${scope.pending} tasks to review`}>
+                      {scope.pending}
+                    </span>
+                  )}
+                  {scope.shopping > 0 && (
+                    <span className="property-state property-state-shopping" aria-label={`${scope.shopping} shopping items`}>
+                      {scope.shopping}
+                    </span>
+                  )}
+                  {scope.collect > 0 && (
+                    <span className="property-state property-state-collect" aria-label={`${scope.collect} collect items`}>
+                      {scope.collect}
                     </span>
                   )}
                   {scope.listed && (
@@ -311,6 +330,7 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
       property,
       scopes,
       latestTimestamp,
+      latestActivity: propertyActivity,
       continueUnit,
       done,
       total,
@@ -350,6 +370,27 @@ function buildPortfolioOverview(properties, units, items, activityLog) {
   };
 }
 
+function formatActorName(email) {
+  const username = email.split("@")[0] || "";
+  return username
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ") || email;
+}
+
+function formatRelativeTime(value) {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(value));
+}
+
 function buildScopeSummary(unit, label, propertyItems) {
   const scopeItems = propertyItems.filter((item) => (unit ? item.unit_id === unit.id : !item.unit_id));
   const listed = Boolean(unit?.listing_published && ["available", "coming-soon"].includes(unit.listing_status));
@@ -359,6 +400,12 @@ function buildScopeSummary(unit, label, propertyItems) {
     label,
     open: scopeItems.filter((item) => item.kind === "task" && item.status === "approved").length,
     pending: scopeItems.filter((item) => item.status === "pending-review").length,
+    shopping: scopeItems.filter((item) => (
+      item.kind === "material" && item.material_type === "shopping" && item.status !== "done"
+    )).length,
+    collect: scopeItems.filter((item) => (
+      item.kind === "material" && item.material_type === "collect" && item.status !== "done"
+    )).length,
     listed,
   };
 }
