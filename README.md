@@ -4,6 +4,21 @@ Turnover Tracker is a small rental turnover app built as a public portfolio/demo
 
 Work is organized as `workspace -> property -> optional unit`. A property-level scope is available for shared work such as roofs, siding, utilities, and grounds; unit scopes hold work specific to an upstairs, downstairs, or main unit. Existing flat unit records are migrated into this hierarchy without moving their tasks into the property-level scope.
 
+## Product
+
+Turnover Tracker is a property operations intelligence system for understanding the physical state of a property and coordinating the work required to maintain it.
+
+It is a multi-property rental operations platform built with React, Vite, and Supabase. It supports role-based workspaces, property- and unit-level task management, attachment storage, public rental listings, and server-side AI workflows that turn voice walkthroughs into reviewable tasks and materials.
+
+## Core Workflows
+
+- Track approved, pending-review, and completed work by property or unit.
+- Manage Shopping List and Collect / Bring materials alongside tasks.
+- Attach photos, files, and dictated audio to work items.
+- Drag active tasks to reorder them on desktop; use the Up and Down controls for touch and keyboard-friendly ordering. Completed tasks remain at the bottom of the list.
+- Publish public-facing rental listings independently from the private operational workspace.
+- Store dictated audio and process it with Supabase Edge Functions into reviewable task and material drafts.
+
 ## Stack
 
 - Vite + React

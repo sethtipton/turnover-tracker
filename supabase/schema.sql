@@ -193,6 +193,19 @@ declare
   activity_unit_id uuid;
   activity_label text;
 begin
+  -- Reordering is operational metadata, not a work-history event.
+  if tg_op = 'UPDATE'
+    and new.sort_order is distinct from old.sort_order
+    and new.title is not distinct from old.title
+    and new.note is not distinct from old.note
+    and new.status is not distinct from old.status
+    and new.material_type is not distinct from old.material_type
+    and new.property_id is not distinct from old.property_id
+    and new.unit_id is not distinct from old.unit_id
+    and new.archived_at is not distinct from old.archived_at then
+    return new;
+  end if;
+
   if tg_op = 'UPDATE'
     and new.title is not distinct from old.title
     and new.note is not distinct from old.note

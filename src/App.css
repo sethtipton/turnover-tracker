@@ -2345,6 +2345,10 @@
     --status-color: var(--color-primary);
     transition: background-color 180ms ease, border-color 180ms ease;
 
+    &.is-reorderable { cursor: grab; }
+    &.is-dragging { opacity: 0.5; }
+    &.is-drag-over { outline: 1px solid var(--color-primary-hover); outline-offset: -1px; }
+
     &.material-shopping { --status-color: var(--color-shopping); }
     &.material-collect { --status-color: var(--color-collect); }
     &.status-pending-review { --status-color: var(--color-pending); }
@@ -2479,6 +2483,13 @@
   }
 
   .archive-icon-button { color: var(--color-text-muted); }
+
+  .item-move-button {
+    color: var(--color-text-muted);
+
+    &:hover:not(:disabled) { color: var(--color-primary-hover); }
+    &:disabled { cursor: not-allowed; opacity: 0.35; }
+  }
 
   .item-actions {
     align-items: center;

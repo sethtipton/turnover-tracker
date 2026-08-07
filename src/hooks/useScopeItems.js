@@ -135,6 +135,22 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     }, previousItems);
   }
 
+  async function reorderItems(orderedIds) {
+    if (orderedIds.length < 2) return false;
+
+    const orderById = new Map(orderedIds.map((itemId, index) => [itemId, index + 1]));
+    const previousItems = items;
+    setItems((current) => current.map((item) => (
+      orderById.has(item.id) ? { ...item, sort_order: orderById.get(item.id) } : item
+    )));
+
+    return runMutation(async () => {
+      await Promise.all(orderedIds.map((itemId, index) => updateItem(itemId, { sort_order: index + 1 })));
+      onMessage("Task order updated.");
+      return true;
+    }, previousItems);
+  }
+
   async function removeItem(item, successMessage) {
     const previousItems = items;
     setItems((current) => current.filter((candidate) => candidate.id !== item.id));
@@ -234,6 +250,7 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     changeStatus,
     approveAll,
     saveItem,
+    reorderItems,
     removeItem,
     archiveItem,
     unarchiveItem,
