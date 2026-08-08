@@ -8,6 +8,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { PortfolioDrilldown } from "./PortfolioDrilldown";
+import { PropertyImage } from "./PropertyImage";
 import {
   getPropertyImage,
   getPropertyImageTransitionName,
@@ -57,7 +58,7 @@ export function PortfolioHome({
           <PortfolioMetric label="Collect" value={overview.totals.collect} busy={busy} tone="collect" panel="collect" activePanel={activePanel} onToggle={togglePanel} />
         </section>
 
-        <div className={`portfolio-drilldown-shell${activePanel ? " is-open" : ""}`} aria-hidden={!activePanel} inert={activePanel ? undefined : ""}>
+        <div className={`portfolio-drilldown-shell${activePanel ? " is-open" : ""}`} aria-hidden={!activePanel} inert={!activePanel}>
           <PortfolioDrilldown
             panel={renderedPanel}
             properties={properties}
@@ -241,15 +242,7 @@ function PropertyVisual({ property, priority = false, transitionName }) {
       style={transitionName ? { viewTransitionName: transitionName } : undefined}
     >
       {imageAvailable ? (
-        <img
-          src={imageSrc}
-          alt={`Exterior of ${property.name}`}
-          width="1024"
-          height="768"
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          onError={() => setFailedImageSrc(imageSrc)}
-        />
+        <PropertyImage src={imageSrc} alt={`Exterior of ${property.name}`} priority={priority} onError={() => setFailedImageSrc(imageSrc)} />
       ) : (
         <div className="property-visual-fallback" aria-hidden="true">
           <Building2 size={42} strokeWidth={1.5} />

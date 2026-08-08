@@ -25,22 +25,22 @@ export function ReviewQueue({
 
   return (
     <section className={`panel review-queue${isOpen ? "" : " is-collapsed"}`} aria-labelledby="review-queue-title" aria-describedby={isOpen ? "review-queue-description" : undefined}>
-      <div className="review-queue-header">
-        <div>
-          <p className="eyebrow">Needs a decision</p>
-          <h2 id="review-queue-title">
-            <button className="panel-toggle" type="button" aria-expanded={isOpen} aria-controls="review-queue-items" onClick={() => setIsCollapsed((current) => !current)}>
-              <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
-              Review Queue <span>{items.length}</span>
-            </button>
-          </h2>
-          {isOpen && <p id="review-queue-description">Check dictated work before it moves into the active lists.</p>}
-        </div>
-        {isOpen && <button type="button" onClick={onApproveAll} disabled={busy}>
+      <div className="panel-title">
+        <h2 id="review-queue-title">
+          <button className="panel-toggle" type="button" aria-expanded={isOpen} aria-controls="review-queue-items" onClick={() => setIsCollapsed((current) => !current)}>
+            <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
+            <span>Review Queue</span>
+          </button>
+        </h2>
+        <span aria-label={`${items.length} pending review items`}>{items.length}</span>
+      </div>
+      {isOpen && <div className="review-queue-header">
+        <p id="review-queue-description">Check dictated work before it moves into the active lists.</p>
+        <button type="button" onClick={onApproveAll} disabled={busy}>
           <CheckCheck size={18} aria-hidden="true" />
           Approve all
-        </button>}
-      </div>
+        </button>
+      </div>}
       <ul className="review-list" id="review-queue-items" role="list" hidden={!isOpen}>
         {items.map((item) => (
           <li className="review-card" key={item.id}>

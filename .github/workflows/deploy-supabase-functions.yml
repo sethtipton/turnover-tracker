@@ -26,7 +26,7 @@ jobs:
           OPENAI_TRANSCRIPTION_MODEL: ${{ vars.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-transcribe' }}
 
       - name: Deploy AI functions
-        run: supabase functions deploy draft-tasks draft-listing-copy --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase functions deploy draft-tasks draft-listing-copy process-maintenance-request --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}

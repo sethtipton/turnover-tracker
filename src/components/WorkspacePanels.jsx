@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
+import { CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -49,7 +49,6 @@ export function ScopeSelector({
 }
 
 export function SummaryGrid({
-  items,
   workMode,
   onToggleWorkMode,
   dictationState,
@@ -60,19 +59,15 @@ export function SummaryGrid({
   statusFilter,
   onQueryChange,
   onStatusChange,
-  onMetricClick,
+  onAddWork,
+  addWorkOpen,
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const pendingCount = items.filter((item) => item.status === "pending-review" && item.kind !== "dictation").length;
   const isRecording = dictationState === "recording";
+
   return (
     <section className="summary-grid" aria-label="Selected scope summary">
-      <div className="summary-main">
-        <div className="summary-metrics">
-          <Metric tone="approved" label="Approved" value={items.filter((item) => item.kind === "task" && item.status === "approved").length} onClick={() => onMetricClick?.("approved")} />
-          <Metric tone="review" label="Pending" value={pendingCount} onClick={() => onMetricClick?.("review")} />
-          <Metric tone="shopping" label="Shopping" value={items.filter((item) => item.material_type === "shopping").length} onClick={() => onMetricClick?.("shopping")} />
-        </div>
+      <div className="summary-toolbar">
         <div className="summary-actions" aria-label="Task actions">
           {!workMode && (
             <div className="dictation-control">
@@ -95,7 +90,7 @@ export function SummaryGrid({
           )}
           <button className={workMode ? "work-mode-button active" : "work-mode-button"} type="button" onClick={onToggleWorkMode} aria-pressed={workMode}>
             <Wrench size={18} aria-hidden="true" />
-            Work Mode
+            {workMode ? "Turn off work mode" : "Work Mode"}
           </button>
           {!workMode && (
             <button
@@ -107,6 +102,17 @@ export function SummaryGrid({
             >
               {filtersOpen ? <X size={17} aria-hidden="true" /> : <Search size={17} aria-hidden="true" />}
               {filtersOpen ? "Close search" : "Search & filter"}
+            </button>
+          )}
+          {!workMode && (
+            <button
+              className="summary-add-button"
+              type="button"
+              aria-expanded={addWorkOpen}
+              aria-controls="add-work-panel"
+              onClick={onAddWork}
+            >
+              <CirclePlus size={17} aria-hidden="true" /> Add task
             </button>
           )}
         </div>
@@ -168,34 +174,21 @@ export function FiltersBar({ query, statusFilter, onQueryChange, onStatusChange 
   );
 }
 
-export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit }) {
-  const [isOpen, setIsOpen] = useState(false);
-
+export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, onClose }) {
   return (
-    <section className={`panel add-panel ${isOpen ? "is-open" : ""}`} aria-labelledby="add-work-title">
-      <h2 id="add-work-title">
-        <button
-          className="add-work-toggle"
-          type="button"
-          aria-expanded={isOpen}
-          aria-controls="add-work-content"
-          onClick={() => setIsOpen((current) => !current)}
-        >
-          <span className="add-work-toggle-label">
-            <CirclePlus size={19} aria-hidden="true" />
-            Add Work
-          </span>
-          <span className="add-work-toggle-meta">Task or material</span>
-          <ChevronDown className="add-work-toggle-icon" size={18} aria-hidden="true" />
-        </button>
-      </h2>
-      <div className="add-work-content" id="add-work-content" hidden={!isOpen}>
-        <p>Create approved tasks, shopping items, or collect/bring reminders.</p>
+    <section className="panel add-panel" id="add-work-panel" aria-labelledby="add-work-title" hidden={!isOpen}>
+      <div className="add-work-content" id="add-work-content">
+        <div className="add-work-heading">
+          <h2 id="add-work-title">Add work</h2>
+          <button className="icon-button add-work-close" type="button" onClick={onClose} aria-label="Close add work">
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
         <form
           className={draft.kind === "material" ? "add-form has-material-type" : "add-form"}
           onSubmit={async (event) => {
             const added = await onSubmit(event);
-            if (added) setIsOpen(false);
+            if (added) onClose?.();
           }}
         >
           <label className="form-field" htmlFor="new-item-kind">
@@ -259,7 +252,7 @@ export function DictationInbox({ recordings, scopeName, onSave, onDelete }) {
   if (recordings.length === 0) return null;
 
   return (
-    <section className="panel" aria-labelledby="dictation-inbox-title">
+    <section className="panel dictation-inbox-title" aria-labelledby="dictation-inbox-title">
       <div className="panel-title">
         <h2 id="dictation-inbox-title">Dictation Inbox</h2>
         <span>{recordings.length} unsaved</span>
@@ -303,20 +296,5 @@ export function StatusMessage({ message, onDismiss }) {
         </p>
       )}
     </div>
-  );
-}
-
-function Metric({ label, value, tone, onClick }) {
-  const isInteractive = value > 0 && Boolean(onClick);
-  const Component = isInteractive ? "button" : "span";
-
-  return (
-    <Component
-      className={`metric metric-${tone}${isInteractive ? " is-interactive" : ""}`}
-      {...(isInteractive ? { type: "button", onClick, "aria-label": `Show ${value} ${label.toLowerCase()} items` } : {})}
-    >
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </Component>
   );
 }

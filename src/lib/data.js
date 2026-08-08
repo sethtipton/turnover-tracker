@@ -18,10 +18,12 @@ export function watchAuth(callback) {
 
 export async function signInWithGoogle() {
   if (!supabase) return;
-  const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
+  const redirectUrl = new URL(`${window.location.origin}${import.meta.env.BASE_URL}`);
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (currentPath !== import.meta.env.BASE_URL) redirectUrl.searchParams.set("next", currentPath);
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo },
+    options: { redirectTo: redirectUrl.toString() },
   });
   if (error) throw error;
 }

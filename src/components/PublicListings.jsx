@@ -14,23 +14,33 @@ import {
   Save,
   SlidersHorizontal,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import { createListingPreview } from "../lib/listings";
 import { getPropertyImageBySlug } from "../lib/propertyImages";
 import { getPublicListingPath, getPublicRouteFromCurrentPath } from "../lib/routing";
 import { AppFooter } from "./AppFooter";
+import { PropertyImage } from "./PropertyImage";
+import { TenantMaintenanceDialog } from "./TenantMaintenanceApp";
 
-export function PublicSite({ listings, busy, error, onSignIn }) {
-  const [route, setRoute] = useState(getPublicRouteFromCurrentPath);
+export function PublicSite({ listings, busy, error, onSignIn, authenticated = false, user, tenantUnits = [], onSignOut, tenantPreview = false, previewRoute, onExitPreview }) {
+  const previewRouteKey = previewRoute ? `${previewRoute.propertySlug}/${previewRoute.unitSlug}` : "";
+  const [route, setRoute] = useState(() => previewRoute || getPublicRouteFromCurrentPath());
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const groupedListings = useMemo(() => groupListings(listings), [listings]);
+  const canReportMaintenance = authenticated && tenantUnits.length > 0;
 
   useEffect(() => {
+    if (previewRoute) {
+      setRoute(previewRoute);
+      return undefined;
+    }
     function syncRoute() {
       setRoute(getPublicRouteFromCurrentPath());
     }
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, []);
+  }, [previewRoute, previewRouteKey]);
 
   const property = groupedListings.find((group) => group.property_slug === route.propertySlug);
   const listing = property?.listings.find((candidate) => candidate.unit_slug === route.unitSlug);
@@ -45,7 +55,7 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
   return (
     <>
       <main className="public-site" id="main-content" tabIndex="-1">
-        <PublicHeader showDirectoryHeading={!isListingRoute && !isPropertyRoute} />
+        <PublicHeader showDirectoryHeading={!isListingRoute && !isPropertyRoute} onReportMaintenance={canReportMaintenance ? () => setMaintenanceDialogOpen(true) : undefined} tenantPreviewLabel={tenantPreview ? `${tenantUnits[0]?.property_name} · ${tenantUnits[0]?.unit_name}` : ""} />
         {error ? (
           <section className="public-empty"><h1>Listings are unavailable</h1><p>{error}</p></section>
         ) : busy && (isListingRoute || isPropertyRoute) ? (
@@ -58,7 +68,8 @@ export function PublicSite({ listings, busy, error, onSignIn }) {
           <PublicListingDirectory listings={listings} busy={busy} />
         )}
       </main>
-      <AppFooter onAuthAction={onSignIn} />
+      <AppFooter authenticated={authenticated} onAuthAction={tenantPreview ? onExitPreview : authenticated ? onSignOut : onSignIn} authActionLabel={tenantPreview ? "Exit preview" : undefined} />
+      {canReportMaintenance && <TenantMaintenanceDialog open={maintenanceDialogOpen} onClose={() => setMaintenanceDialogOpen(false)} user={user} tenantUnits={tenantUnits} preview={tenantPreview} />}
     </>
   );
 }
@@ -107,7 +118,7 @@ export function ListingViewSwitch({ view, onViewChange }) {
   );
 }
 
-function PublicHeader({ showDirectoryHeading = false }) {
+function PublicHeader({ showDirectoryHeading = false, onReportMaintenance, tenantPreviewLabel }) {
   return (
     <header className={`public-header${showDirectoryHeading ? " has-header-subtitle" : ""}`}>
       <a className="public-brand" href={getPublicListingPath("")}>
@@ -117,6 +128,8 @@ function PublicHeader({ showDirectoryHeading = false }) {
           {showDirectoryHeading && <h2>Homes near Kent State University</h2>}
         </div>
       </a>
+      {onReportMaintenance && <button className="public-maintenance-button" type="button" onClick={onReportMaintenance}><Wrench size={17} aria-hidden="true" /> Maintenance Request</button>}
+      {tenantPreviewLabel && <p className="public-tenant-preview" role="status">Admin tenant preview · {tenantPreviewLabel}</p>}
     </header>
   );
 }
@@ -133,7 +146,7 @@ function PublicListingDirectory({ listings, busy }) {
         <section className="public-empty"><h2>No homes are available right now.</h2><p>Check back soon for upcoming listings.</p></section>
       ) : (
         <ul className="public-listing-grid" role="list">
-          {listings.map((listing) => <ListingCard key={listing.unit_id} listing={listing} />)}
+          {listings.map((listing, index) => <ListingCard key={listing.unit_id} listing={listing} priority={index === 0} />)}
         </ul>
       )}
     </section>
@@ -165,7 +178,7 @@ function PublicPropertyPage({ property, preview = false }) {
         {(property.property_type || location) && <p>{[property.property_type, location].filter(Boolean).join(" / ")}</p>}
       </header>
       <ul className="public-property-listings" role="list">
-        {property.listings.map((listing) => <ListingCard key={listing.unit_id} listing={listing} preview={preview} />)}
+        {property.listings.map((listing, index) => <ListingCard key={listing.unit_id} listing={listing} preview={preview} priority={index === 0} />)}
       </ul>
     </section>
   );
@@ -192,7 +205,8 @@ export function ListingDetail({ listing, preview = false }) {
       <header className={`public-listing-hero${imageSrc ? " has-image" : ""}`}>
         {imageSrc && (
           <div className="public-listing-hero-media">
-            <img src={imageSrc} alt={`Exterior of ${listing.property_name}`} fetchPriority="high" />
+            <PropertyImage src={imageSrc} alt={`Exterior of ${listing.property_name}`} priority />
+            <span className={`listing-status listing-status-${listing.listing_status}`}>{getListingStatusLabel(listing.listing_status)}</span>
             {preview && isLiveListing && (
               <span className="listing-live-overlay">
                 Live on Tree City Rentals as {getListingStatusLabel(listing.listing_status)}.
@@ -201,8 +215,6 @@ export function ListingDetail({ listing, preview = false }) {
           </div>
         )}
         <div className="public-listing-hero-content">
-          <p className="public-kicker">Tree City Rentals</p>
-          <span className={`listing-status listing-status-${listing.listing_status}`}>{getListingStatusLabel(listing.listing_status)}</span>
           <h1>{title}</h1>
           {listing.display_address && <p className="listing-address"><MapPin size={18} aria-hidden="true" /> {listing.display_address}</p>}
           <p className="listing-rent">{formatRent(listing)}</p>
@@ -232,7 +244,7 @@ export function ListingDetail({ listing, preview = false }) {
   );
 }
 
-function ListingCard({ listing, preview = false }) {
+function ListingCard({ listing, preview = false, priority = false }) {
   const title = listing.listing_headline || `${listing.property_name} ${listing.unit_name}`;
   const imageSrc = getPropertyImageBySlug(listing.property_slug);
   return (
@@ -240,16 +252,13 @@ function ListingCard({ listing, preview = false }) {
       <a href={getPublicListingPath(listing.property_slug, listing.unit_slug)}>
         <div className="public-listing-card-media">
           {imageSrc ? (
-            <img src={imageSrc} alt={`Exterior of ${listing.property_name}`} loading="lazy" />
+            <PropertyImage src={imageSrc} alt={`Exterior of ${listing.property_name}`} priority={priority} />
           ) : (
             <Building2 size={28} aria-label={`Image unavailable for ${listing.property_name}`} />
           )}
+          <span className={`listing-status listing-status-${listing.listing_status}`}>{getListingStatusLabel(listing.listing_status)}</span>
         </div>
         <div className="public-listing-card-content">
-          <div className="listing-card-topline">
-            <span className={`listing-status listing-status-${listing.listing_status}`}>{getListingStatusLabel(listing.listing_status)}</span>
-            <span>{formatRent(listing)}</span>
-          </div>
           <h2>{title}</h2>
           {listing.display_address && <p><MapPin size={16} aria-hidden="true" /> {listing.display_address}</p>}
           {(listing.neighborhood || listing.available_date) && (
@@ -263,6 +272,7 @@ function ListingCard({ listing, preview = false }) {
             {listing.full_bathrooms != null && <span>{formatNumber(listing.full_bathrooms)} ba</span>}
             {listing.interior_square_feet != null && <span>{listing.interior_square_feet.toLocaleString()} sq ft</span>}
           </div>
+          <p className="listing-rent">{formatRent(listing)}</p>
         </div>
       </a>
       {preview && <p className="preview-card-note">Preview</p>}

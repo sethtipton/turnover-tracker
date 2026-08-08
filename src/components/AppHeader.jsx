@@ -4,6 +4,7 @@ import {
   getPropertyImageTransitionName,
   getPropertyTitleTransitionName,
 } from "../lib/propertyImages";
+import { PropertyImage } from "./PropertyImage";
 
 export function AppHeader({
   property,
@@ -31,7 +32,7 @@ export function AppHeader({
           className="app-header-visual"
           style={{ viewTransitionName: getPropertyImageTransitionName(property.id) }}
         >
-          <img src={propertyImage} alt="" width="1024" height="768" />
+          <PropertyImage src={propertyImage} alt="" />
         </div>
       ) : showBrandIdentity ? (
         <div className="app-header-visual app-header-brand-mark" aria-hidden="true">

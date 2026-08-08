@@ -7,6 +7,7 @@ const source = join(distDir, "index.html");
 
 await copyFile(source, join(distDir, "404.html"));
 await writeFile(join(distDir, ".nojekyll"), "");
+await createFallback("maintenance");
 
 for (const property of INITIAL_PROPERTIES) {
   const propertySlug = getSlug(property.name);

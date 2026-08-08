@@ -101,6 +101,48 @@ export function getPublicRouteFromCurrentPath() {
   };
 }
 
+export function isMaintenanceRoute() {
+  return getCurrentRouteParts()[0] === "maintenance";
+}
+
+export function isMaintenanceQrRoute() {
+  return getCurrentRouteParts({ preserveCase: true })[0]?.toLowerCase() === "m";
+}
+
+export function getMaintenanceQrTokenFromCurrentPath() {
+  const routeParts = getCurrentRouteParts({ preserveCase: true });
+  return routeParts[0]?.toLowerCase() === "m" && routeParts.length === 2
+    ? routeParts[1]
+    : "";
+}
+
+export function getMaintenancePath() {
+  return `${basePath}maintenance/`;
+}
+
+export function getMaintenanceQrPath(token) {
+  return `${basePath}m/${encodeURIComponent(token)}/`;
+}
+
+export function updateMaintenancePath({ replace = false } = {}) {
+  const path = getMaintenancePath();
+  if (window.location.pathname !== path) {
+    window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+  }
+}
+
+export function restoreAuthReturnPath() {
+  const url = new URL(window.location.href);
+  const next = url.searchParams.get("next");
+  if (!next) return false;
+
+  const target = new URL(next, window.location.origin);
+  if (target.origin !== window.location.origin || !target.pathname.startsWith(basePath)) return false;
+
+  window.history.replaceState({}, "", `${target.pathname}${target.search}${target.hash}`);
+  return true;
+}
+
 function getUnitRouteNames(unitName) {
   return [unitName, ...(UNIT_ROUTE_ALIASES[unitName] || [])];
 }
@@ -130,12 +172,20 @@ export function getPublicListingPath(propertySlug, unitSlug = "") {
   return `${basePath}${segments.join("/")}/`;
 }
 
-function getCurrentRouteParts() {
+function getCurrentRouteParts({ preserveCase = false } = {}) {
   const path = window.location.pathname;
   if (!path.startsWith(basePath)) return [];
-  return decodeURIComponent(path.slice(basePath.length))
+  return path.slice(basePath.length)
     .replace(/^\/+|\/+$/g, "")
     .split("/")
     .filter(Boolean)
-    .map((part) => part.toLowerCase());
+    .map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean)
+    .map((part) => preserveCase ? part : part.toLowerCase());
 }

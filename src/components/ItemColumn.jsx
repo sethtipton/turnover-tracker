@@ -19,6 +19,7 @@ export function ItemColumn({
   openRequest = 0,
   reorderable = false,
   onReorder,
+  tone = "",
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [draggingId, setDraggingId] = useState("");
@@ -74,7 +75,7 @@ export function ItemColumn({
   }
 
   return (
-    <section className={`panel item-column ${isOpen ? "" : "is-collapsed"} ${compact ? "compact" : ""}`} aria-labelledby={`${panelId}-title`}>
+    <section className={`panel item-column ${tone ? `item-column-${tone}` : ""} ${isOpen ? "" : "is-collapsed"} ${compact ? "compact" : ""}`} aria-labelledby={`${panelId}-title`}>
       <div className="panel-title">
         <h2 id={`${panelId}-title`}>
           <button

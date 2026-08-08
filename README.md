@@ -44,7 +44,7 @@ Turnover Tracker
 https://gholbnyvijfyqdwqgjan.supabase.co
 ```
 
-1. For a new project, run `supabase/schema.sql` in the Supabase SQL Editor. For the existing project, apply the versioned migrations in `supabase/migrations`.
+1. For a new project, run `supabase/schema.sql` in the Supabase SQL Editor. Its bootstrap alignment section mirrors the later schema migrations, including property access, public listings, and Phase 4. For an existing project, apply the versioned migrations in `supabase/migrations` instead.
 2. In Authentication > URL Configuration, set the Site URL:
    - `https://sethtipton.github.io/turnover-tracker`
 3. Add these redirect URLs in Authentication > URL Configuration:
@@ -69,7 +69,7 @@ Workspace access is stored in `public.workspace_members`. The initial Tipton Ren
 
 Do not put an OpenAI API key in any `VITE_` environment variable. Vite variables are bundled into the public browser app, so the key must stay server-side.
 
-The app uses Supabase Edge Functions at `supabase/functions/draft-tasks` and `supabase/functions/draft-listing-copy` to keep OpenAI calls server-side. They read:
+The app uses Supabase Edge Functions at `supabase/functions/draft-tasks`, `supabase/functions/draft-listing-copy`, and `supabase/functions/process-maintenance-request` to keep OpenAI calls server-side. They read:
 
 ```text
 SUPABASE_URL
@@ -78,6 +78,8 @@ OPENAI_API_KEY
 OPENAI_MODEL
 OPENAI_TRANSCRIPTION_MODEL
 ```
+
+`process-maintenance-request` also uses Supabase's server-only `SUPABASE_SERVICE_ROLE_KEY` after first validating the caller through RLS. Never expose that key to Vite or a browser environment.
 
 For local Supabase function development:
 
@@ -91,7 +93,7 @@ For hosted Supabase:
 
 ```bash
 supabase secrets set OPENAI_API_KEY="your-real-key" OPENAI_MODEL="gpt-4.1-mini" OPENAI_TRANSCRIPTION_MODEL="gpt-4o-transcribe" --project-ref gholbnyvijfyqdwqgjan
-supabase functions deploy draft-tasks draft-listing-copy --project-ref gholbnyvijfyqdwqgjan
+supabase functions deploy draft-tasks draft-listing-copy process-maintenance-request --project-ref gholbnyvijfyqdwqgjan
 ```
 
 For GitHub-managed deployment, add these repository secrets in GitHub > Settings > Secrets and variables > Actions:
@@ -109,7 +111,17 @@ OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
 ```
 
-Then run the manual `Deploy Supabase Functions` workflow from the GitHub Actions tab. `draft-tasks` transcribes saved dictation audio, creates pending-review tasks/materials from the transcript, and stores the transcript on the original dictation item. `draft-listing-copy` produces editable, fact-grounded suggestions for listing headlines, descriptions, and amenities; it never saves or publishes a listing.
+Then run the manual `Deploy Supabase Functions` workflow from the GitHub Actions tab. `draft-tasks` remains available for legacy dictation. `process-maintenance-request` is the Phase 4 intake pipeline: it preserves request audio, transcribes request voice entries, writes immutable analysis snapshots, safely splits admin walkthroughs, and creates idempotent pending-review work proposals. `draft-listing-copy` produces editable, fact-grounded suggestions for listing headlines, descriptions, and amenities; it never saves or publishes a listing.
+
+## Maintenance requests
+
+Apply `supabase/migrations/20260806160000_maintenance_requests.sql` before deploying the Phase 4 function. The migration adds unit-scoped tenant memberships, maintenance case files, immutable analyses, request-specific media, and RLS policies. Tenant accounts are intentionally not workspace or property members; create an active `tenant_memberships` row for each tenant/unit relationship. Internal users can open **Maintenance requests** and use the clearly labelled **Tenant view preview** without weakening tenant RLS.
+
+Apply `supabase/migrations/20260806170000_property_admin_maintenance_access.sql` as well. A property-level `admin` can then open the maintenance console and sees only their authorized properties, requests, and units; workspace-wide people/access controls remain unavailable.
+
+For residents, `/maintenance/` is the stable direct request route and can be used as the eventual QR-code destination. Signed-in tenants can also open the public listings and use **Report maintenance**; the popup submits only for their active tenant/unit membership. Google sign-in preserves the direct maintenance route after authentication.
+
+Apply `supabase/migrations/20260807090000_maintenance_qr_codes.sql` and `20260807100000_maintenance_qr_function_grants.sql` to enable one permanent QR code per unit. The code contains only an opaque `/m/:token/` URL. A logged-out scan sees no unit information and returns to the same URL after Google sign-in; signed-in residents can submit only when their active `tenant_memberships` row matches that exact unit. Property admins can manage QR cards from **Maintenance requests** for their authorized properties, including SVG viewing, copying, printing, and deliberate regeneration. Set `VITE_PUBLIC_APP_URL` in `.env.local` when printable cards must point to a production URL while developing locally.
 
 ## Deploy
 

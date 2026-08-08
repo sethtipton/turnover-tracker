@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ClipboardList, Hammer, Mic, ShoppingCart } from "lucide-react";
 import "./App.css";
@@ -7,10 +7,13 @@ import { AppFooter } from "./components/AppFooter";
 import { AppHeader } from "./components/AppHeader";
 import { ItemColumn } from "./components/ItemColumn";
 import { AccessGate, LandingPage } from "./components/LandingPage";
+import { MaintenanceQrRoute } from "./components/MaintenanceQrRoute";
+import { MaintenanceWorkspace } from "./components/MaintenanceWorkspace";
 import { PeopleAccess } from "./components/PeopleAccess";
 import { PortfolioHome } from "./components/PortfolioHome";
 import { ListingViewSwitch, ListingWorkspace, PublicSite } from "./components/PublicListings";
 import { ReviewQueue } from "./components/ReviewQueue";
+import { TenantMaintenanceAccess, TenantMaintenanceApp } from "./components/TenantMaintenanceApp";
 import {
   DictationInbox,
   QuickAddPanel,
@@ -21,9 +24,9 @@ import {
 import { useAudioRecorder } from "./hooks/useAudioRecorder";
 import { usePortfolioOverview } from "./hooks/usePortfolioOverview";
 import { useScopeItems } from "./hooks/useScopeItems";
-import { draftListingField, draftTasksFromDictation } from "./lib/ai";
+import { draftListingField } from "./lib/ai";
+import { loadTenantUnits, submitMaintenanceRequest } from "./lib/maintenance";
 import {
-  addItem,
   getAttachmentUrl,
   getSession,
   loadPropertyMembers,
@@ -39,10 +42,17 @@ import {
   signOut,
   updateProperty,
   updateUnit,
-  uploadAttachment,
   watchAuth,
 } from "./lib/data";
-import { getScopeFromCurrentPath, updateScopePath } from "./lib/routing";
+import {
+  getMaintenanceQrTokenFromCurrentPath,
+  getScopeFromCurrentPath,
+  isMaintenanceQrRoute,
+  isMaintenanceRoute,
+  restoreAuthReturnPath,
+  updateMaintenancePath,
+  updateScopePath,
+} from "./lib/routing";
 import { isSupabaseConfigured } from "./lib/supabase";
 
 const emptyDraft = {
@@ -63,10 +73,13 @@ function App() {
   const [draft, setDraft] = useState(emptyDraft);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [openRequests, setOpenRequests] = useState({ tasks: 0, shopping: 0, review: 0 });
+  const openRequests = { tasks: 0, shopping: 0, collect: 0, review: 0 };
+  const [addWorkOpen, setAddWorkOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [accessError, setAccessError] = useState("");
   const [mediaUrls, setMediaUrls] = useState({});
+  const unavailableMediaPathsRef = useRef(new Set());
+  const pendingMediaPathsRef = useRef(new Set());
   const [workMode, setWorkMode] = useState(false);
   const [peopleAccessOpen, setPeopleAccessOpen] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState([]);
@@ -80,6 +93,10 @@ function App() {
   const [publicListings, setPublicListings] = useState([]);
   const [publicListingsBusy, setPublicListingsBusy] = useState(true);
   const [publicListingsError, setPublicListingsError] = useState("");
+  const [tenantUnits, setTenantUnits] = useState([]);
+  const [tenantUserId, setTenantUserId] = useState("");
+  const [maintenanceOpen, setMaintenanceOpen] = useState(() => isMaintenanceRoute());
+  const [maintenancePreview, setMaintenancePreview] = useState(null);
 
   const {
     state: dictationState,
@@ -131,6 +148,7 @@ function App() {
   const busy = itemsBusy || dictationBusy || listingBusy;
   const sessionUserId = session?.user?.id || "";
   const workspaceReady = Boolean(sessionUserId && workspaceUserId === sessionUserId);
+  const tenantReady = Boolean(sessionUserId && tenantUserId === sessionUserId && tenantUnits.length > 0);
   const userEmail = session?.user?.email?.toLowerCase();
   const userDisplayName = getUserDisplayName(session?.user);
   const isWorkspaceOwner = workspaceMembers.some((member) => (
@@ -190,7 +208,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || session !== null) return undefined;
+    if (!isSupabaseConfigured || session === undefined) return undefined;
 
     let isMounted = true;
     setPublicListingsBusy(true);
@@ -212,6 +230,11 @@ function App() {
   }, [session]);
 
   useEffect(() => {
+    if (!sessionUserId || !restoreAuthReturnPath()) return;
+    setMaintenanceOpen(isMaintenanceRoute());
+  }, [sessionUserId]);
+
+  useEffect(() => {
     if (!sessionUserId) {
       setWorkspace(null);
       setWorkspaceUserId("");
@@ -219,6 +242,9 @@ function App() {
       setUnits([]);
       setSelectedPropertyId("");
       setSelectedUnitId("");
+      setTenantUnits([]);
+      setTenantUserId("");
+      setMaintenanceOpen(false);
       return undefined;
     }
 
@@ -227,14 +253,41 @@ function App() {
     async function loadInitialData() {
       setAccessError("");
       setWorkspaceUserId("");
+      setTenantUserId("");
       try {
-        const workspaceData = await loadWorkspace();
-        const [propertyData, unitData, memberData, visibilityData] = await Promise.all([
+        let workspaceData;
+        try {
+          workspaceData = await loadWorkspace();
+        } catch (workspaceError) {
+          // Workspace members and property admins do not need tenant-unit
+          // data. Only fall back to the tenant RPC when workspace access is
+          // absent, which avoids an expected-missing tenant feature request
+          // for regular administrators during staged database deployment.
+          const tenantData = await loadTenantUnits();
+          if (!isMounted) return;
+          if (tenantData.length > 0) {
+            setWorkspace(null);
+            setTenantUnits(tenantData);
+            setTenantUserId(sessionUserId);
+            return;
+          }
+          throw workspaceError;
+        }
+        const [propertyResult, unitResult, memberResult, visibilityResult] = await Promise.allSettled([
           loadProperties(workspaceData.id),
           loadUnits(workspaceData.id),
           loadWorkspaceMembers(workspaceData.id),
           loadPropertyVisibilityPreferences(workspaceData.id, sessionUserId),
         ]);
+        if (propertyResult.status !== "fulfilled") throw propertyResult.reason;
+        if (unitResult.status !== "fulfilled") throw unitResult.reason;
+        const propertyData = propertyResult.value;
+        const unitData = unitResult.value;
+        // A property admin is intentionally not a workspace member. They can
+        // still open the scoped maintenance console; owner-only controls stay
+        // unavailable when workspace membership cannot be read.
+        const memberData = memberResult.status === "fulfilled" ? memberResult.value : [];
+        const visibilityData = visibilityResult.status === "fulfilled" ? visibilityResult.value : [];
         const isOwner = memberData.some((member) => (
           member.email === userEmail && member.role === "owner"
         ));
@@ -250,6 +303,7 @@ function App() {
         setWorkspaceMembers(memberData);
         setPropertyMembers(propertyMemberData);
         setPropertyVisibility(visibilityData);
+        setTenantUnits([]);
         setSelectedPropertyId(routeScope.propertyId);
         setSelectedUnitId(routeScope.unitId);
         setWorkspaceUserId(sessionUserId);
@@ -274,6 +328,11 @@ function App() {
 
   useEffect(() => {
     function handlePopState() {
+      if (isMaintenanceRoute()) {
+        setMaintenanceOpen(true);
+        return;
+      }
+      setMaintenanceOpen(false);
       const routeScope = getScopeFromCurrentPath(properties, units);
       setSelectedPropertyId(routeScope.propertyId);
       setSelectedUnitId(routeScope.unitId);
@@ -295,17 +354,33 @@ function App() {
 
   useEffect(() => {
     const attachments = items.flatMap((item) => item.attachments || []);
-    const missing = attachments.filter((attachment) => !mediaUrls[attachment.storage_path]);
+    const missingByPath = new Map();
+    for (const attachment of attachments) {
+      if (
+        !mediaUrls[attachment.storage_path]
+        && !unavailableMediaPathsRef.current.has(attachment.storage_path)
+        && !pendingMediaPathsRef.current.has(attachment.storage_path)
+      ) {
+        missingByPath.set(attachment.storage_path, attachment);
+      }
+    }
+    const missing = [...missingByPath.values()];
     if (missing.length === 0 || !isSupabaseConfigured) return;
 
     let isMounted = true;
-    Promise.all(
+    missing.forEach((attachment) => pendingMediaPathsRef.current.add(attachment.storage_path));
+    Promise.allSettled(
       missing.map(async (attachment) => [attachment.storage_path, await getAttachmentUrl(attachment.storage_path)]),
     )
-      .then((urls) => {
-        if (isMounted) setMediaUrls((current) => ({ ...current, ...Object.fromEntries(urls) }));
-      })
-      .catch((error) => setMessage(error.message));
+      .then((results) => {
+        const urls = [];
+        results.forEach((result, index) => {
+          pendingMediaPathsRef.current.delete(missing[index].storage_path);
+          if (result.status === "fulfilled") urls.push(result.value);
+          else unavailableMediaPathsRef.current.add(missing[index].storage_path);
+        });
+        if (isMounted && urls.length > 0) setMediaUrls((current) => ({ ...current, ...Object.fromEntries(urls) }));
+      });
 
     return () => {
       isMounted = false;
@@ -343,20 +418,8 @@ function App() {
     handleOpenScope(propertyId, "");
   }
 
-  function handleSummaryMetric(metric) {
-    setQuery("");
-
-    if (metric === "approved" || metric === "done") {
-      setStatusFilter(metric);
-      setOpenRequests((current) => ({ ...current, tasks: current.tasks + 1 }));
-      return;
-    }
-
-    setStatusFilter("all");
-    setOpenRequests((current) => ({
-      ...current,
-      [metric]: current[metric] + 1,
-    }));
+  function handleToggleAddWork() {
+    setAddWorkOpen((current) => !current);
   }
 
   function handleUnitChange(unitId) {
@@ -566,40 +629,18 @@ function App() {
 
     setDictationBusy(true);
     try {
-      const dictationItem = await addItem({
-        workspace_id: workspace.id,
-        property_id: recording.propertyId,
-        unit_id: recording.unitId || null,
-        title: "Dictated property update",
-        category: "Dictation",
-        note: "Raw recording saved. AI extraction queued.",
-        kind: "dictation",
-        status: "pending-review",
-        sort_order: items.length + 1,
-      });
-      const attachment = await uploadAttachment({
+      setMessage("Recording saved. Processing the maintenance intake...");
+      await submitMaintenanceRequest({
         workspaceId: workspace.id,
         propertyId: recording.propertyId,
-        unitId: recording.unitId,
-        itemId: dictationItem.id,
-        file: recording.file,
-        kind: "audio",
+        unitId: recording.unitId || null,
+        user: session.user,
+        audioFile: recording.file,
+        sourceType: "admin-walkthrough",
+        title: "Admin walkthrough intake",
+        visibility: "admin",
       });
-      try {
-        setMessage("Recording saved. Drafting pending tasks...");
-        const draftResult = await draftTasksFromDictation({
-          propertyId: recording.propertyId,
-          unitId: recording.unitId,
-          dictationItemId: dictationItem.id,
-          attachmentId: attachment.id,
-        });
-        const draftCount = draftResult?.items?.length || 0;
-        setMessage(draftCount > 0
-          ? `Created ${draftCount} pending review item${draftCount === 1 ? "" : "s"}.`
-          : "Recording saved, but no draft items were found.");
-      } catch (aiError) {
-        setMessage(`Recording saved, but AI drafting could not run: ${aiError.message}`);
-      }
+      setMessage("Walkthrough processed. Review its case files and pending work in Maintenance requests.");
       removeRecording(recording.id);
       if (
         recording.propertyId === selectedPropertyId
@@ -617,13 +658,24 @@ function App() {
   function renderWorkGrid(compact) {
     return (
       <div className="work-grid">
+        {!compact && <ReviewQueue
+          items={reviewItems}
+          busy={busy}
+          onApprove={(item) => changeStatus(item, "approved")}
+          onApproveAll={() => approveAll(reviewItems)}
+          onItemChange={saveItem}
+          onReject={handleRejectItem}
+          onDeleteAttachment={handleDeleteAttachment}
+          mediaUrls={mediaUrls}
+          openRequest={openRequests.review}
+        />}
         {!compact && (
           <div className="materials-row">
-            <ItemColumn title="Shopping List" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} />
-            <ItemColumn title="Collect / Bring" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+            <ItemColumn title="Shopping List" tone="shopping" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} />
+            <ItemColumn title="Collect / Bring" tone="collect" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.collect} />
           </div>
         )}
-        <ItemColumn title="Tasks" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} />
+        <ItemColumn title="Tasks" tone="task" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} />
         {!compact && (
           <>
             <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
@@ -636,9 +688,20 @@ function App() {
 
   if (!isSupabaseConfigured) return <LandingPage onSignIn={signInWithGoogle} setupMissing />;
   if (session === undefined) return <AppBootScreen />;
+  if (isMaintenanceQrRoute()) return <MaintenanceQrRoute token={getMaintenanceQrTokenFromCurrentPath()} user={session?.user} onSignIn={signInWithGoogle} onSignOut={signOut} />;
+  if (!session && isMaintenanceRoute()) return <TenantMaintenanceAccess onSignIn={signInWithGoogle} />;
   if (!session) return <PublicSite listings={publicListings} busy={publicListingsBusy} error={publicListingsError} onSignIn={signInWithGoogle} />;
+  if (tenantReady && !workspace && isMaintenanceRoute()) return <TenantMaintenanceApp user={session.user} tenantUnits={tenantUnits} onSignOut={signOut} />;
+  if (tenantReady && !workspace) return <PublicSite listings={publicListings} busy={publicListingsBusy} error={publicListingsError} authenticated user={session.user} tenantUnits={tenantUnits} onSignOut={signOut} />;
   if (accessError) return <AccessGate email={userEmail} onSignOut={signOut} message={accessError} />;
   if (!workspaceReady) return <AppBootScreen label="Loading workspace..." />;
+  if (maintenancePreview) {
+    if (maintenancePreview.mode === "public") {
+      const previewListing = publicListings.find((listing) => listing.unit_id === maintenancePreview.unit.unit_id);
+      return <PublicSite listings={publicListings} busy={false} error="" authenticated user={session.user} tenantUnits={[maintenancePreview.unit]} tenantPreview previewRoute={previewListing ? { propertySlug: previewListing.property_slug, unitSlug: previewListing.unit_slug } : undefined} onExitPreview={() => setMaintenancePreview(null)} />;
+    }
+    return <TenantMaintenanceApp user={session.user} tenantUnits={[maintenancePreview.unit]} preview onExitPreview={() => setMaintenancePreview(null)} />;
+  }
 
   return (
     <>
@@ -653,7 +716,7 @@ function App() {
                 ? selectedUnit?.name || "Whole Property"
                 : getPortfolioTitle(userDisplayName, visibleProperties.length)}
             peopleAccessOpen={peopleAccessOpen}
-            scopeSelector={!peopleAccessOpen && !workMode ? (
+            scopeSelector={!peopleAccessOpen && !maintenanceOpen && !workMode ? (
               <ScopeSelector
                 properties={selectorProperties}
                 units={units}
@@ -666,7 +729,21 @@ function App() {
           />
         </div>
 
-        {peopleAccessOpen ? (
+        {maintenanceOpen ? (
+          <MaintenanceWorkspace
+            user={session.user}
+            workspace={workspace}
+            properties={properties}
+            units={units}
+            initialPropertyId={selectedPropertyId}
+            initialUnitId={selectedUnitId}
+            onPreview={setMaintenancePreview}
+            onClose={() => {
+              setMaintenanceOpen(false);
+              updateScopePath(selectedProperty, selectedUnit, { replace: true });
+            }}
+          />
+        ) : peopleAccessOpen ? (
           <>
             <PeopleAccess
               members={workspaceMembers}
@@ -739,7 +816,6 @@ function App() {
             {!workMode && selectedProperty && listingView === "tasks" && (
               <section className="listing-workspace listing-workspace-enter task-workspace" aria-label="Tasks workspace">
                 <SummaryGrid
-                  items={activeScopeItems}
                   workMode={workMode}
                   onToggleWorkMode={() => {
                     setWorkMode((current) => !current);
@@ -753,30 +829,22 @@ function App() {
                   statusFilter={statusFilter}
                   onQueryChange={setQuery}
                   onStatusChange={setStatusFilter}
-                  onMetricClick={handleSummaryMetric}
-                />
-                <ReviewQueue
-                  items={reviewItems}
-                  busy={busy}
-                  onApprove={(item) => changeStatus(item, "approved")}
-                  onApproveAll={() => approveAll(reviewItems)}
-                  onItemChange={saveItem}
-                  onReject={handleRejectItem}
-                  onDeleteAttachment={handleDeleteAttachment}
-                  mediaUrls={mediaUrls}
-                  openRequest={openRequests.review}
-                />
-                <DictationInbox
-                  recordings={selectedScopeRecordings}
-                  scopeName={selectedScopeTitle}
-                  onSave={saveRecording}
-                  onDelete={removeRecording}
+                  onAddWork={handleToggleAddWork}
+                  addWorkOpen={addWorkOpen}
                 />
                 <QuickAddPanel
                   draft={draft}
                   busy={busy}
                   onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                   onSubmit={handleAddItem}
+                  isOpen={addWorkOpen}
+                  onClose={() => setAddWorkOpen(false)}
+                />
+                <DictationInbox
+                  recordings={selectedScopeRecordings}
+                  scopeName={selectedScopeTitle}
+                  onSave={saveRecording}
+                  onDelete={removeRecording}
                 />
                 <StatusMessage message={message} onDismiss={setMessage} />
                 {renderWorkGrid(false)}
@@ -793,6 +861,18 @@ function App() {
         isWorkspaceOwner={isWorkspaceOwner}
         peopleAccessOpen={peopleAccessOpen}
         onTogglePeopleAccess={handleTogglePeopleAccess}
+        maintenanceOpen={maintenanceOpen}
+        onToggleMaintenance={() => {
+          setMaintenanceOpen((current) => {
+            const next = !current;
+            if (next) updateMaintenancePath();
+            else updateScopePath(selectedProperty, selectedUnit, { replace: true });
+            return next;
+          });
+          setPeopleAccessOpen(false);
+          setWorkMode(false);
+        }}
+        canOpenMaintenance={Boolean(workspace)}
       />
     </>
   );
