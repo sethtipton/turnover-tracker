@@ -2286,6 +2286,7 @@
 
   .item-card {
     --status-color: var(--color-primary);
+    grid-template-columns: minmax(0, 1fr);
     transition: background-color 180ms ease, border-color 180ms ease;
 
     &.is-reorderable { cursor: grab; }
@@ -2607,8 +2608,6 @@
 
     .app-header {
       grid-template-columns: minmax(0, 1fr) auto;
-
-
       & .eyebrow { display: block; }
     }
 
@@ -2666,6 +2665,19 @@
 
     }
 
+    .item-card {
+      .item-actions {
+        gap:.5rem
+      }
+    }
+
+    .item-title-row {
+      & h3 {
+        
+      }
+    }
+
+
     .item-title-row {
       align-items: start;
     }
@@ -2675,8 +2687,8 @@
       padding: var(--space-2) var(--space-1);
 
       & strong {
-        min-inline-size: 1.35rem;
-        padding: 0.125rem var(--space-1);
+        min-inline-size: .35rem;
+        padding:0;
         font-size: var(--font-size-xs);
       }
     }
