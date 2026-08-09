@@ -65,6 +65,16 @@ export function SummaryGrid({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const isRecording = dictationState === "recording";
 
+  function toggleFilters() {
+    if (!filtersOpen) onAddWork(false);
+    setFiltersOpen((current) => !current);
+  }
+
+  function toggleAddWork() {
+    setFiltersOpen(false);
+    onAddWork();
+  }
+
   return (
     <section className="summary-grid" aria-label="Selected scope summary">
       <div className="summary-toolbar">
@@ -98,7 +108,7 @@ export function SummaryGrid({
               type="button"
               aria-expanded={filtersOpen}
               aria-controls="task-search-controls"
-              onClick={() => setFiltersOpen((current) => !current)}
+              onClick={toggleFilters}
             >
               {filtersOpen ? <X size={17} aria-hidden="true" /> : <Search size={17} aria-hidden="true" />}
               {filtersOpen ? "Close search" : "Search & filter"}
@@ -110,9 +120,9 @@ export function SummaryGrid({
               type="button"
               aria-expanded={addWorkOpen}
               aria-controls="add-work-panel"
-              onClick={onAddWork}
+              onClick={toggleAddWork}
             >
-              <CirclePlus size={17} aria-hidden="true" /> Add task
+              <CirclePlus size={17} aria-hidden="true" /> Add
             </button>
           )}
         </div>
@@ -179,8 +189,8 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
     <section className="panel add-panel" id="add-work-panel" aria-labelledby="add-work-title" hidden={!isOpen}>
       <div className="add-work-content" id="add-work-content">
         <div className="add-work-heading">
-          <h2 id="add-work-title">Add work</h2>
-          <button className="icon-button add-work-close" type="button" onClick={onClose} aria-label="Close add work">
+          <h2 id="add-work-title">Add tasks or materials</h2>
+          <button className="icon-button add-work-close" type="button" onClick={onClose} aria-label="Close add">
             <X size={17} aria-hidden="true" />
           </button>
         </div>

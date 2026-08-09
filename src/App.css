@@ -88,6 +88,9 @@
     font-weight: var(--font-weight-regular);
   }
 
+  /* Route changes focus the heading for assistive technology; it is not keyboard-interactive. */
+  .app-header h1:focus { outline: none; }
+
   .hero-copy > .setup-note {
     color: var(--color-danger);
     font-weight: var(--font-weight-extrabold);
@@ -2913,6 +2916,14 @@
 
     .public-site { padding-block-start: var(--space-3); }
     .public-header { margin-block-end: 2rem; }
+    .public-listing-hero.has-image {
+      grid-template-columns: minmax(0, 1fr);
+
+      & .public-listing-hero-media {
+        aspect-ratio: 16 / 10;
+        border-radius: 0;
+      }
+    }
     .listing-edit-heading { align-items: start; }
     .listing-edit-heading button { flex: none; }
     .listing-edit-fields { grid-template-columns: minmax(0, 1fr); }

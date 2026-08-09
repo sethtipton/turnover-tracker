@@ -418,8 +418,8 @@ function App() {
     handleOpenScope(propertyId, "");
   }
 
-  function handleToggleAddWork() {
-    setAddWorkOpen((current) => !current);
+  function handleToggleAddWork(nextOpen) {
+    setAddWorkOpen((current) => typeof nextOpen === "boolean" ? nextOpen : !current);
   }
 
   function handleUnitChange(unitId) {
