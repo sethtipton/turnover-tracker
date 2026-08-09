@@ -511,9 +511,10 @@ function App() {
       setProperties((current) => current.map((property) => (
         property.id === updated.id ? updated : property
       )));
-      setMessage("Property listing details saved.");
+      return updated;
     } catch (error) {
       setMessage(error.message);
+      throw error;
     } finally {
       setListingBusy(false);
     }
@@ -526,11 +527,10 @@ function App() {
       setUnits((current) => current.map((unit) => (
         unit.id === updated.id ? updated : unit
       )));
-      setMessage(updated.listing_published && ["available", "coming-soon"].includes(updated.listing_status)
-        ? "Listing saved and live on Tree City Rentals."
-        : "Listing saved. It is not currently public.");
+      return updated;
     } catch (error) {
       setMessage(error.message);
+      throw error;
     } finally {
       setListingBusy(false);
     }
@@ -554,7 +554,7 @@ function App() {
         listing_description: "description",
         amenities: "amenities",
       }[field] || "listing field";
-      setMessage(`AI suggested a ${fieldLabel}. Review it, then save the listing when ready.`);
+      setMessage(`AI suggested a ${fieldLabel}.`);
       return result;
     } catch (error) {
       setMessage(`AI could not suggest listing copy: ${error.message}`);

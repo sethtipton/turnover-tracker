@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bath,
   BedDouble,
   Building2,
   CalendarDays,
   ChevronDown,
+  CircleAlert,
   ExternalLink,
   Home,
   Landmark,
   LoaderCircle,
   MapPin,
   Maximize,
-  Save,
   SlidersHorizontal,
   Sparkles,
   Wrench,
@@ -283,51 +283,47 @@ function ListingCard({ listing, preview = false, priority = false }) {
 function ListingEditor({ property, units, busy, onSaveProperty, onSaveUnit, onSuggestListingField }) {
   return (
     <section className="listing-editor" aria-label="Edit listing">
-      <PropertyEditor property={property} busy={busy} onSave={onSaveProperty} />
+      <PropertyEditor key={property.id} property={property} onSave={onSaveProperty} />
       {units.map((unit) => <UnitEditor key={unit.id} unit={unit} busy={busy} onSave={onSaveUnit} onSuggestListingField={onSuggestListingField} />)}
     </section>
   );
 }
 
-function PropertyEditor({ property, busy, onSave }) {
+function PropertyEditor({ property, onSave }) {
   const [form, setForm] = useState(toPropertyForm(property));
-  useEffect(() => setForm(toPropertyForm(property)), [property]);
+  const autosave = useListingAutosave(onSave);
 
   function change(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    await onSave(form);
+    autosave.queue(name, value);
   }
 
   return (
-    <form className="listing-edit-panel" onSubmit={submit}>
-      <div className="listing-edit-heading"><h3>Shared property information</h3><button type="submit" disabled={busy}><Save size={17} aria-hidden="true" /> Save property</button></div>
+    <form className="listing-edit-panel" onSubmit={(event) => event.preventDefault()}>
+      <div className="listing-edit-heading"><h3>Shared property information</h3><AutosaveStatus status={autosave.status} onRetry={autosave.retry} /></div>
       <details>
         <summary><span>Property basics</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
-          <Field label="Public property name" name="public_name" value={form.public_name} onChange={change} />
-          <Field label="Property type" name="property_type" value={form.property_type} onChange={change} placeholder="Apartment, duplex, house..." />
+          <Field label="Public property name" name="public_name" value={form.public_name} onChange={change} onBlur={autosave.flush} />
+          <Field label="Property type" name="property_type" value={form.property_type} onChange={change} onBlur={autosave.flush} placeholder="Apartment, duplex, house..." />
         </div>
       </details>
       <details>
         <summary><span>Location</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
-          <Field label="Street address" name="street_address" value={form.street_address} onChange={change} />
-          <Field label="City" name="city" value={form.city} onChange={change} />
-          <Field label="State" name="state" value={form.state} onChange={change} />
-          <Field label="ZIP code" name="postal_code" value={form.postal_code} onChange={change} />
-          <Field label="Neighborhood or area" name="neighborhood" value={form.neighborhood} onChange={change} />
+          <Field label="Street address" name="street_address" value={form.street_address} onChange={change} onBlur={autosave.flush} />
+          <Field label="City" name="city" value={form.city} onChange={change} onBlur={autosave.flush} />
+          <Field label="State" name="state" value={form.state} onChange={change} onBlur={autosave.flush} />
+          <Field label="ZIP code" name="postal_code" value={form.postal_code} onChange={change} onBlur={autosave.flush} />
+          <Field label="Neighborhood or area" name="neighborhood" value={form.neighborhood} onChange={change} onBlur={autosave.flush} />
         </div>
       </details>
       <details>
         <summary><span>Property records</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
           <div className="auditor-url-control">
-            <Field label="Auditor parcel URL" name="auditor_parcel_url" type="url" value={form.auditor_parcel_url} onChange={change} />
+            <Field label="Auditor parcel URL" name="auditor_parcel_url" type="url" value={form.auditor_parcel_url} onChange={change} onBlur={autosave.flush} />
             {form.auditor_parcel_url && (
               <a className="secondary-link auditor-parcel-link" href={form.auditor_parcel_url} target="_blank" rel="noreferrer">
                 <Landmark size={17} aria-hidden="true" />
@@ -345,52 +341,45 @@ function PropertyEditor({ property, busy, onSave }) {
 function UnitEditor({ unit, busy, onSave, onSuggestListingField }) {
   const [form, setForm] = useState(toUnitForm(unit));
   const [suggestingField, setSuggestingField] = useState("");
-  useEffect(() => setForm(toUnitForm(unit)), [unit]);
+  const [suggestionErrorField, setSuggestionErrorField] = useState("");
+  const autosave = useListingAutosave((patch) => onSave(unit.id, patch));
 
   function change(event) {
     const { name, value, checked, type } = event.target;
-    setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    await onSave(unit.id, {
-      ...form,
-      monthly_rent: toOptionalInteger(form.monthly_rent),
-      bedrooms: toOptionalNumber(form.bedrooms),
-      full_bathrooms: toOptionalNumber(form.full_bathrooms),
-      half_bathrooms: toOptionalNumber(form.half_bathrooms),
-      interior_square_feet: toOptionalInteger(form.interior_square_feet),
-      available_date: form.available_date || null,
-      amenities: form.amenities.split("\n").map((value) => value.trim()).filter(Boolean),
-    });
+    const nextValue = type === "checkbox" ? checked : value;
+    setForm((current) => ({ ...current, [name]: nextValue }));
+    autosave.queue(name, toUnitPatch(name, nextValue), { immediate: type === "checkbox" || type === "date" || event.target.tagName === "SELECT" });
   }
 
   async function suggest(field) {
     if (!onSuggestListingField || suggestingField || busy) return;
 
+    setSuggestionErrorField("");
     setSuggestingField(field);
     try {
       const result = await onSuggestListingField(unit.id, field);
       const suggestion = typeof result?.suggestion === "string" ? result.suggestion.trim() : "";
-      if (suggestion) setForm((current) => ({ ...current, [field]: suggestion }));
+      if (suggestion) {
+        setForm((current) => ({ ...current, [field]: suggestion }));
+        autosave.queue(field, toUnitPatch(field, suggestion), { immediate: true });
+      }
     } catch {
-      // The shared status announcer reports suggestion failures.
+      setSuggestionErrorField(field);
     } finally {
       setSuggestingField("");
     }
   }
 
   return (
-    <form className="listing-edit-panel" onSubmit={submit}>
-      <div className="listing-edit-heading"><h3>{unit.name} listing</h3><button type="submit" disabled={busy}><Save size={17} aria-hidden="true" /> Save listing</button></div>
+    <form className="listing-edit-panel" onSubmit={(event) => event.preventDefault()}>
+      <div className="listing-edit-heading"><h3>{unit.name} listing</h3><AutosaveStatus status={autosave.status} onRetry={autosave.retry} /></div>
       <details>
         <summary><span>Publishing and address</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
           <label className="listing-publish-toggle"><input type="checkbox" name="listing_published" checked={form.listing_published} onChange={change} /> <span>Publish this listing</span></label>
           <SelectField label="Availability" name="listing_status" value={form.listing_status} onChange={change} options={LISTING_STATUS_OPTIONS} />
-          <SuggestionField label="Listing headline" name="listing_headline" value={form.listing_headline} onChange={change} onSuggest={() => suggest("listing_headline")} busy={suggestingField === "listing_headline"} />
-          <Field label="Unit number" name="unit_number" value={form.unit_number} onChange={change} />
+          <SuggestionField label="Listing headline" name="listing_headline" value={form.listing_headline} onChange={change} onBlur={autosave.flush} onSuggest={() => suggest("listing_headline")} busy={suggestingField === "listing_headline"} error={suggestionErrorField === "listing_headline"} />
+          <Field label="Unit number" name="unit_number" value={form.unit_number} onChange={change} onBlur={autosave.flush} />
           <SelectField label="Address visibility" name="address_visibility" value={form.address_visibility} onChange={change} options={ADDRESS_VISIBILITY_OPTIONS} />
         </div>
         <p className="listing-editor-note">Only published Available and Coming soon listings appear publicly.</p>
@@ -398,53 +387,57 @@ function UnitEditor({ unit, busy, onSave, onSuggestListingField }) {
       <details>
         <summary><span>Rental details</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
-          <Field label="Monthly rent" name="monthly_rent" type="number" min="0" inputMode="numeric" value={form.monthly_rent} onChange={change} />
+          <Field label="Monthly rent" name="monthly_rent" type="number" min="0" inputMode="numeric" value={form.monthly_rent} onChange={change} onBlur={autosave.flush} />
           <SelectField label="Rent display type" name="rent_display_type" value={form.rent_display_type} onChange={change} options={RENT_DISPLAY_OPTIONS} />
-          <Field label="Available date" name="available_date" type="date" value={form.available_date} onChange={change} />
-          <Field label="Lease term" name="lease_term" value={form.lease_term} onChange={change} placeholder="12 months" />
-          <Field label="Bedrooms" name="bedrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.bedrooms} onChange={change} />
-          <Field label="Full bathrooms" name="full_bathrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.full_bathrooms} onChange={change} />
-          <Field label="Half bathrooms" name="half_bathrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.half_bathrooms} onChange={change} />
-          <Field label="Interior square footage" name="interior_square_feet" type="number" min="1" inputMode="numeric" value={form.interior_square_feet} onChange={change} />
+          <Field label="Available date" name="available_date" type="date" value={form.available_date} onChange={change} onBlur={autosave.flush} />
+          <Field label="Lease term" name="lease_term" value={form.lease_term} onChange={change} onBlur={autosave.flush} placeholder="12 months" />
+          <Field label="Bedrooms" name="bedrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.bedrooms} onChange={change} onBlur={autosave.flush} />
+          <Field label="Full bathrooms" name="full_bathrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.full_bathrooms} onChange={change} onBlur={autosave.flush} />
+          <Field label="Half bathrooms" name="half_bathrooms" type="number" min="0" step="0.5" inputMode="decimal" value={form.half_bathrooms} onChange={change} onBlur={autosave.flush} />
+          <Field label="Interior square footage" name="interior_square_feet" type="number" min="1" inputMode="numeric" value={form.interior_square_feet} onChange={change} onBlur={autosave.flush} />
         </div>
       </details>
       <details>
         <summary><span>Description and amenities</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <div className="listing-edit-fields">
-          <SuggestionField label="Public listing description" name="listing_description" value={form.listing_description} onChange={change} onSuggest={() => suggest("listing_description")} busy={suggestingField === "listing_description"} multiline rows="5" />
-          <SuggestionField label="Amenities" hint="one per line" name="amenities" value={form.amenities} onChange={change} onSuggest={() => suggest("amenities")} busy={suggestingField === "amenities"} multiline rows="4" />
+          <SuggestionField label="Public listing description" name="listing_description" value={form.listing_description} onChange={change} onBlur={autosave.flush} onSuggest={() => suggest("listing_description")} busy={suggestingField === "listing_description"} error={suggestionErrorField === "listing_description"} multiline rows="5" />
+          <SuggestionField label="Amenities" hint="one per line" name="amenities" value={form.amenities} onChange={change} onBlur={autosave.flush} onSuggest={() => suggest("amenities")} busy={suggestingField === "amenities"} error={suggestionErrorField === "amenities"} multiline rows="4" />
         </div>
       </details>
     </form>
   );
 }
 
-function Field({ label, name, value, onChange, type = "text", ...inputProps }) {
-  return <label className="form-field"><span>{label}</span><input name={name} type={type} value={value} onChange={onChange} {...inputProps} /></label>;
+function Field({ label, name, value, onChange, onBlur, type = "text", ...inputProps }) {
+  return <label className="form-field"><span>{label}</span><input name={name} type={type} value={value} onChange={onChange} onBlur={onBlur} {...inputProps} /></label>;
 }
 
-function SuggestionField({ label, hint, name, value, onChange, onSuggest, busy, multiline = false, ...inputProps }) {
+function SuggestionField({ label, hint, name, value, onChange, onBlur, onSuggest, busy, error, multiline = false, ...inputProps }) {
   const fieldId = `listing-${name}`;
+  const state = busy ? "generating" : error ? "error" : "idle";
+  const buttonLabel = state === "generating" ? "Generating" : state === "error" ? "Try again" : "Generate";
 
   return (
     <div className="form-field full-width suggestion-field">
       <div className="suggestion-field-label">
         <label htmlFor={fieldId}>{label}{hint && <> <span className="optional-label">{hint}</span></>}</label>
         <button
-          className="field-suggestion-button"
+          className={`field-suggestion-button ai is-${state}`}
           type="button"
           onClick={onSuggest}
           disabled={busy}
-          aria-label={busy ? `Suggesting ${label}` : `Suggest ${label} with AI`}
-          title={busy ? `Suggesting ${label}` : `Suggest ${label} with AI`}
+          aria-label={state === "generating" ? `Generating ${label}` : error ? `Retry AI suggestion for ${label}` : `Generate ${label} with AI`}
+          title={state === "generating" ? `Generating ${label}` : error ? `Retry AI suggestion for ${label}` : `Generate ${label} with AI`}
         >
-          {busy ? <LoaderCircle className="field-suggestion-spinner" size={17} aria-hidden="true" /> : <Sparkles size={17} aria-hidden="true" />}
+          {busy ? <LoaderCircle className="field-suggestion-spinner" size={16} aria-hidden="true" /> : error ? <CircleAlert size={16} aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />}
+          <span>{buttonLabel}</span>
         </button>
+        {error && <span className="field-suggestion-error" role="alert">Could not generate. Try again.</span>}
       </div>
       {multiline ? (
-        <textarea id={fieldId} name={name} value={value} onChange={onChange} {...inputProps} />
+        <textarea id={fieldId} name={name} value={value} onChange={onChange} onBlur={onBlur} {...inputProps} />
       ) : (
-        <input id={fieldId} name={name} value={value} onChange={onChange} {...inputProps} />
+        <input id={fieldId} name={name} value={value} onChange={onChange} onBlur={onBlur} {...inputProps} />
       )}
     </div>
   );
@@ -452,6 +445,96 @@ function SuggestionField({ label, hint, name, value, onChange, onSuggest, busy, 
 
 function SelectField({ label, name, value, onChange, options }) {
   return <label className="form-field"><span>{label}</span><select name={name} value={value} onChange={onChange}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+}
+
+function AutosaveStatus({ status, onRetry }) {
+  if (status === "idle") return null;
+  const label = status === "saving" ? "Saving..." : status === "error" ? "Could not save" : "Saved";
+  return (
+    <span className={`listing-autosave-status is-${status}`}>
+      <span role="status">{label}</span>
+      {status === "error" && <button type="button" onClick={onRetry}>Retry</button>}
+    </span>
+  );
+}
+
+function useListingAutosave(onSave) {
+  const [status, setStatus] = useState("idle");
+  const onSaveRef = useRef(onSave);
+  const timersRef = useRef(new Map());
+  const queueRef = useRef(Promise.resolve());
+  const pendingSavesRef = useRef(0);
+  const failedPatchesRef = useRef(new Map());
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
+  const save = useCallback((patch) => {
+    const fieldName = Object.keys(patch)[0];
+    pendingSavesRef.current += 1;
+    setStatus("saving");
+    const runSave = async () => {
+      try {
+        await onSaveRef.current(patch);
+        pendingSavesRef.current -= 1;
+        failedPatchesRef.current.delete(fieldName);
+        setStatus(pendingSavesRef.current > 0 ? "saving" : failedPatchesRef.current.size > 0 ? "error" : "saved");
+      } catch {
+        pendingSavesRef.current -= 1;
+        failedPatchesRef.current.set(fieldName, patch);
+        setStatus("error");
+      }
+    };
+    queueRef.current = queueRef.current.then(runSave, runSave);
+  }, []);
+
+  const flush = useCallback((event) => {
+    const { name } = event.target;
+    const pending = timersRef.current.get(name);
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    timersRef.current.delete(name);
+    save(pending.patch);
+  }, [save]);
+
+  const queue = useCallback((name, value, { immediate = false } = {}) => {
+    const pending = timersRef.current.get(name);
+    if (pending) window.clearTimeout(pending.timer);
+    const patch = { [name]: value };
+    if (immediate) {
+      timersRef.current.delete(name);
+      save(patch);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      timersRef.current.delete(name);
+      save(patch);
+    }, 700);
+    timersRef.current.set(name, { timer, patch });
+  }, [save]);
+
+  const retry = useCallback(() => {
+    [...failedPatchesRef.current.values()].forEach(save);
+  }, [save]);
+
+  useEffect(() => () => {
+    timersRef.current.forEach(({ timer, patch }) => {
+      window.clearTimeout(timer);
+      save(patch);
+    });
+    timersRef.current.clear();
+  }, [save]);
+
+  return { status, queue, flush, retry };
+}
+
+function toUnitPatch(name, value) {
+  if (["monthly_rent", "interior_square_feet"].includes(name)) return toOptionalInteger(value);
+  if (["bedrooms", "full_bathrooms", "half_bathrooms"].includes(name)) return toOptionalNumber(value);
+  if (name === "available_date") return value || null;
+  if (name === "amenities") return value.split("\n").map((item) => item.trim()).filter(Boolean);
+  return value;
 }
 
 function Detail({ term, value, icon }) {
