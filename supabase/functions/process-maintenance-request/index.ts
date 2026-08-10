@@ -196,11 +196,14 @@ async function processSingleRequest({
       user: formatRequestInput(request, snapshot),
       sanitize: sanitizeRequestAnalysis,
     });
+    const guardedDraft = applyKnownAmbiguityGuardrails(draft, request, snapshot);
+    const proposedItems = limitReviewMaterialSuggestions(guardedDraft.proposed_items);
     const output: RequestAnalysisOutput = {
-      ...draft,
-      relevant_history: materializeRelevantHistory(draft, snapshot.relevant_history),
+      ...guardedDraft,
+      proposed_items: proposedItems,
+      relevant_history: materializeRelevantHistory(guardedDraft, snapshot.relevant_history),
     };
-    await createGeneratedItems(service, request, claim.analysis.id, output.proposed_items, "proposal");
+    await createGeneratedItems(service, request, claim.analysis.id, output.proposed_items, "proposal", getSubmittedRequestText(request, snapshot));
     await completeAnalysis(service, request, claim.analysis.id, output, snapshot, openAiModel);
     return { status: "completed", requestId: request.id, analysisId: claim.analysis.id, proposedItemCount: output.proposed_items.length };
   } catch (error) {
@@ -551,6 +554,7 @@ async function createGeneratedItems(
   analysisId: string,
   items: ProposedItem[],
   prefix: "proposal" | "direct",
+  submittedRequestText = "",
 ) {
   const { data: existing, error: existingError } = await service
     .from("items")
@@ -584,7 +588,7 @@ async function createGeneratedItems(
       maintenance_analysis_id: analysisId,
       generation_key: `${prefix}:${originalIndex}`,
       title: item.title,
-      note: item.note,
+      note: prefix === "proposal" ? appendSubmittedRequest(item.note, submittedRequestText) : item.note,
       category: item.kind === "material"
         ? item.material_type === "collect" ? "Collect / Bring" : "Shopping List"
         : "Task",
@@ -596,6 +600,78 @@ async function createGeneratedItems(
   });
   const { error } = await service.from("items").insert(rows);
   if (error) throw error;
+}
+
+function getSubmittedRequestText(request: RequestRow, snapshot: Awaited<ReturnType<typeof getInputSnapshot>>) {
+  if (request.original_description.trim()) return request.original_description.trim();
+  return snapshot.entries
+    .filter((entry) => entry.entry_type === "description" || entry.entry_type === "audio")
+    .map((entry) => entry.transcript || entry.content)
+    .filter((text) => text.trim())
+    .join("\n")
+    .trim();
+}
+
+function appendSubmittedRequest(note: string, submittedRequestText: string) {
+  const source = submittedRequestText.trim();
+  if (!source) return note;
+  const label = `Original request: ${source}`;
+  return note.includes(label) ? note : [note.trim(), label].filter(Boolean).join("\n\n");
+}
+
+function limitReviewMaterialSuggestions(items: ProposedItem[]) {
+  const materialCounts = { shopping: 0, collect: 0 };
+  return items.filter((item) => {
+    if (item.kind !== "material") return true;
+    if (item.material_type === "shopping" && item.confidence !== "high") return false;
+    if (item.material_type === "collect" && item.confidence === "low") return false;
+
+    const type = item.material_type === "collect" ? "collect" : "shopping";
+    if (materialCounts[type] >= 3) return false;
+    materialCounts[type] += 1;
+    return true;
+  });
+}
+
+function applyKnownAmbiguityGuardrails(
+  draft: RequestAnalysisDraft,
+  request: RequestRow,
+  snapshot: Awaited<ReturnType<typeof getInputSnapshot>>,
+): RequestAnalysisDraft {
+  const submittedText = getSubmittedRequestText(request, snapshot);
+  const normalizedText = submittedText.toLocaleLowerCase();
+  const mentionsPlumbingFixture = /\b(sink|faucet|tap|drain|pipe|plumbing)\b/.test(normalizedText);
+  const describesDropping = /\bdropp?ing\b/.test(normalizedText);
+  if (!mentionsPlumbingFixture || !describesDropping) return draft;
+
+  const question = "When you say the sink is ‘dropping,’ do you mean dripping or leaking, or that the sink itself is sagging or coming loose?";
+  return {
+    ...draft,
+    facts: draft.facts.length > 0 ? draft.facts : [submittedText],
+    unknowns: uniqueText([
+      "Whether the report refers to a water drip or leak, or to the sink physically sagging or coming loose.",
+      ...draft.unknowns,
+    ], 8),
+    clarifying_questions: uniqueText([question, ...draft.clarifying_questions], 6),
+    possible_causes: [],
+    proposed_items: [{
+      title: "Clarify kitchen sink issue",
+      note: "Confirm whether the report means a drip or leak, or that the sink itself is sagging or coming loose, before assigning repair work or materials.",
+      kind: "task",
+      material_type: "none",
+      confidence: "high",
+    }, {
+      title: "Bring kitchen sink inspection tools",
+      note: "Bring a flashlight, gloves, and basic plumbing hand tools to inspect whether the report concerns a drip or leak, or a sink that is sagging or coming loose.",
+      kind: "material",
+      material_type: "collect",
+      confidence: "medium",
+    }],
+  };
+}
+
+function uniqueText(values: string[], maxItems: number) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].slice(0, maxItems);
 }
 
 async function completeAnalysis(

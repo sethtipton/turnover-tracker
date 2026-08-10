@@ -83,7 +83,11 @@ export function MaintenanceQrControls({ property, selectedUnit, propertyUnits })
           </div>
         ) : <p className="maintenance-qr-note">This unit does not have a maintenance QR code yet. Apply the maintenance QR migration, then reload this page.</p>
       ) : (
-        <p className="maintenance-qr-note">Choose a unit above to view, copy, print, or regenerate its individual maintenance QR code.</p>
+        unitsWithTokens.length > 0 ? (
+          <div className="maintenance-qr-card-list" aria-label={`${property.name} maintenance QR codes`}>
+            {unitsWithTokens.map((propertyUnit) => <QrUnitCard key={propertyUnit.id} property={property} unit={propertyUnit} />)}
+          </div>
+        ) : <p className="maintenance-qr-note">This property does not have a maintenance QR code yet. Apply the maintenance QR migration, then reload this page.</p>
       )}
 
       {message && <p className="message" role="status">{message}</p>}

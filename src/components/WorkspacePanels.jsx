@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
+import { ChevronDown, CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -28,6 +28,7 @@ export function ScopeSelector({
             <option key={property.id} value={property.id}>{property.name}</option>
           ))}
         </select>
+        <ChevronDown className="scope-select-icon" size={18} aria-hidden="true" />
       </label>
       <label className="form-field" htmlFor="scope-select">
         <span className="visually-hidden">Scope</span>
@@ -43,6 +44,7 @@ export function ScopeSelector({
             <option key={unit.id} value={unit.id}>{unit.name}</option>
           ))}
         </select>
+        <ChevronDown className="scope-select-icon" size={18} aria-hidden="true" />
       </label>
     </section>
   );

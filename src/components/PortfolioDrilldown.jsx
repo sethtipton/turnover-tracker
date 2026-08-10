@@ -134,7 +134,7 @@ function ShoppingRunList({ panel, title, groups, busy, onItemChange }) {
 function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
   const [isOpen, setIsOpen] = useState(false);
   const contentId = `portfolio-group-items-${group.property.id}`;
-  const scopeGroups = group.units.length > 1 || group.items.some(({ unit }) => !unit)
+  const scopeGroups = group.units.length > 0
     ? getScopeGroups(group)
     : null;
 
