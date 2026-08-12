@@ -63,7 +63,7 @@ export function MaintenanceQrControls({ property, selectedUnit, propertyUnits })
         <div>
           <p className="eyebrow">Unit access</p>
           <h3 id="maintenance-qr-controls-title"><QrCode size={20} aria-hidden="true" /> Maintenance QR codes</h3>
-          <p>Each unit has one permanent QR code. Scanning it still requires tenant sign-in and exact unit authorization.</p>
+          <p>Each unit has a unique QR link that identifies its unit without exposing unit details. A scan confirms the code is valid, then requires sign-in; Supabase verifies the active tenant or property-admin relationship and locks the request to that property and unit. The token is stored on the unit, is unique, and regeneration immediately invalidates older printed cards. RLS also rejects copied-code or edited-payload requests for another unit.</p>
         </div>
         {unitsWithTokens.length > 0 && <button className="ghost" type="button" onClick={() => setPrintUnits(unitsWithTokens)}><Printer size={17} aria-hidden="true" /> Print all unit cards</button>}
       </div>
