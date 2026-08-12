@@ -46,11 +46,13 @@ import {
 } from "./lib/data";
 import {
   getMaintenanceQrTokenFromCurrentPath,
+  getMaintenancePreviewFromCurrentPath,
   getScopeFromCurrentPath,
   isMaintenanceQrRoute,
   isMaintenanceRoute,
   restoreAuthReturnPath,
   updateMaintenancePath,
+  updateMaintenancePreviewPath,
   updateScopePath,
 } from "./lib/routing";
 import { isSupabaseConfigured } from "./lib/supabase";
@@ -96,7 +98,7 @@ function App() {
   const [tenantUnits, setTenantUnits] = useState([]);
   const [tenantUserId, setTenantUserId] = useState("");
   const [maintenanceOpen, setMaintenanceOpen] = useState(() => isMaintenanceRoute());
-  const [maintenancePreview, setMaintenancePreview] = useState(null);
+  const [maintenancePreview, setMaintenancePreview] = useState(() => getMaintenancePreviewFromCurrentPath());
 
   const {
     state: dictationState,
@@ -294,7 +296,10 @@ function App() {
         const propertyMemberData = isOwner
           ? await loadPropertyMembers(workspaceData.id)
           : [];
-        const routeScope = getScopeFromCurrentPath(propertyData, unitData);
+        const maintenancePreviewScope = getMaintenancePreviewFromCurrentPath();
+        const routeScope = maintenancePreviewScope?.propertyId
+          ? { propertyId: maintenancePreviewScope.propertyId, unitId: maintenancePreviewScope.unitId }
+          : getScopeFromCurrentPath(propertyData, unitData);
         if (!isMounted) return;
 
         setWorkspace(workspaceData);
@@ -330,9 +335,16 @@ function App() {
     function handlePopState() {
       if (isMaintenanceRoute()) {
         setMaintenanceOpen(true);
+        const preview = getMaintenancePreviewFromCurrentPath();
+        setMaintenancePreview(preview);
+        if (preview?.propertyId) {
+          setSelectedPropertyId(preview.propertyId);
+          setSelectedUnitId(preview.unitId);
+        }
         return;
       }
       setMaintenanceOpen(false);
+      setMaintenancePreview(null);
       const routeScope = getScopeFromCurrentPath(properties, units);
       setSelectedPropertyId(routeScope.propertyId);
       setSelectedUnitId(routeScope.unitId);
@@ -570,11 +582,30 @@ function App() {
     if (nextView !== "tasks") setWorkMode(false);
   }
 
-  async function handleAddItem(event) {
+  async function handleAddItem(event, imageFile = null) {
     event.preventDefault();
-    const added = await addWork(draft);
+    const added = await addWork(draft, imageFile);
     if (added) setDraft(emptyDraft);
     return added;
+  }
+
+  function handleMaintenancePreview(preview) {
+    const nextPreview = {
+      mode: preview.mode,
+      propertyId: preview.propertyId || selectedPropertyId,
+      unitId: preview.unitId || selectedUnitId,
+    };
+    setMaintenancePreview(nextPreview);
+    updateMaintenancePreviewPath(nextPreview);
+  }
+
+  function exitMaintenancePreview() {
+    if (maintenancePreview?.propertyId) {
+      setSelectedPropertyId(maintenancePreview.propertyId);
+      setSelectedUnitId(maintenancePreview.unitId);
+    }
+    setMaintenancePreview(null);
+    updateMaintenancePath({ replace: true });
   }
 
   async function handleDeleteItem(item) {
@@ -696,11 +727,24 @@ function App() {
   if (accessError) return <AccessGate email={userEmail} onSignOut={signOut} message={accessError} />;
   if (!workspaceReady) return <AppBootScreen label="Loading workspace..." />;
   if (maintenancePreview) {
-    if (maintenancePreview.mode === "public") {
-      const previewListing = publicListings.find((listing) => listing.unit_id === maintenancePreview.unit.unit_id);
-      return <PublicSite listings={publicListings} busy={false} error="" authenticated user={session.user} tenantUnits={[maintenancePreview.unit]} tenantPreview previewRoute={previewListing ? { propertySlug: previewListing.property_slug, unitSlug: previewListing.unit_slug } : undefined} onExitPreview={() => setMaintenancePreview(null)} />;
-    }
-    return <TenantMaintenanceApp user={session.user} tenantUnits={[maintenancePreview.unit]} preview onExitPreview={() => setMaintenancePreview(null)} />;
+    const requestedPropertyId = maintenancePreview.propertyId || selectedPropertyId;
+    const previewPropertyId = properties.some((property) => property.id === requestedPropertyId)
+      ? requestedPropertyId
+      : properties[0]?.id || "";
+    const previewPropertyUnits = units.filter((unit) => unit.property_id === previewPropertyId);
+    const requestedUnitId = maintenancePreview.unitId || selectedUnitId;
+    const previewUnitId = previewPropertyUnits.some((unit) => unit.id === requestedUnitId)
+      ? requestedUnitId
+      : previewPropertyUnits[0]?.id || "";
+    const previewUnit = {
+      membership_id: "admin-preview",
+      workspace_id: workspace.id,
+      property_id: previewPropertyId,
+      unit_id: previewUnitId,
+      property_name: properties.find((property) => property.id === previewPropertyId)?.name || "Selected property",
+      unit_name: units.find((unit) => unit.id === previewUnitId)?.name || "Whole property",
+    };
+    return <TenantMaintenanceApp user={session.user} tenantUnits={[previewUnit]} preview onExitPreview={exitMaintenancePreview} />;
   }
 
   return (
@@ -737,7 +781,7 @@ function App() {
             units={units}
             initialPropertyId={selectedPropertyId}
             initialUnitId={selectedUnitId}
-            onPreview={setMaintenancePreview}
+            onPreview={handleMaintenancePreview}
             onClose={() => {
               setMaintenanceOpen(false);
               updateScopePath(selectedProperty, selectedUnit, { replace: true });

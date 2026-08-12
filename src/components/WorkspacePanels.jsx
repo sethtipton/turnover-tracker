@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
+import { ChevronDown, CirclePlus, ImagePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -187,6 +187,9 @@ export function FiltersBar({ query, statusFilter, onQueryChange, onStatusChange 
 }
 
 export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, onClose }) {
+  const [imageFile, setImageFile] = useState(null);
+  const [imageInputKey, setImageInputKey] = useState(0);
+
   return (
     <section className="panel add-panel" id="add-work-panel" aria-labelledby="add-work-title" hidden={!isOpen}>
       <div className="add-work-content" id="add-work-content">
@@ -199,8 +202,12 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
         <form
           className={draft.kind === "material" ? "add-form has-material-type" : "add-form"}
           onSubmit={async (event) => {
-            const added = await onSubmit(event);
-            if (added) onClose?.();
+            const added = await onSubmit(event, imageFile);
+            if (added) {
+              setImageFile(null);
+              setImageInputKey((current) => current + 1);
+              onClose?.();
+            }
           }}
         >
           <label className="form-field" htmlFor="new-item-kind">
@@ -251,6 +258,18 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
               onChange={(event) => onDraftChange({ note: event.target.value })}
               placeholder="Add useful details"
               maxLength="500"
+            />
+          </label>
+          <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor="new-item-image" title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
+            <ImagePlus size={18} aria-hidden="true" />
+            <span className="visually-hidden">{imageFile ? `Change attached photo: ${imageFile.name}` : "Attach photo"}</span>
+            <input
+              key={imageInputKey}
+              id="new-item-image"
+              name="image"
+              type="file"
+              accept="image/*"
+              onChange={(event) => setImageFile(event.target.files?.[0] || null)}
             />
           </label>
           <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> Add</button>

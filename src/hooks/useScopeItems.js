@@ -55,12 +55,12 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     );
   }, [propertyId, refresh, unitId]);
 
-  async function addWork(draft) {
+  async function addWork(draft, imageFile = null) {
     const title = draft.title.trim();
     if (!title || !workspaceId || !propertyId) return false;
 
     return runMutation(async () => {
-      await addItem({
+      const item = await addItem({
         workspace_id: workspaceId,
         property_id: propertyId,
         unit_id: unitId || null,
@@ -72,6 +72,21 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
         status: "approved",
         sort_order: items.length + 1,
       });
+      if (imageFile) {
+        try {
+          await uploadAttachment({
+            workspaceId,
+            propertyId,
+            unitId: unitId || null,
+            itemId: item.id,
+            file: imageFile,
+            kind: getAttachmentKind(imageFile, "photo"),
+          });
+        } catch (error) {
+          await deleteItem(item.id);
+          throw error;
+        }
+      }
       onMessage(`${title} added.`);
       return true;
     });

@@ -259,6 +259,30 @@ export async function rejectMaintenanceItem(itemId) {
   if (error) throw error;
 }
 
+export async function resolveMaintenanceRequest(requestId) {
+  const { error } = await supabase
+    .from("maintenance_requests")
+    .update({
+      status: "resolved",
+      tenant_status: "resolved",
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", requestId);
+  if (error) throw error;
+}
+
+export async function reopenMaintenanceRequest(requestId) {
+  const { error } = await supabase
+    .from("maintenance_requests")
+    .update({
+      status: "under-review",
+      tenant_status: "received",
+      resolved_at: null,
+    })
+    .eq("id", requestId);
+  if (error) throw error;
+}
+
 function toTenantRequest(request) {
   if (!request) return request;
   return {

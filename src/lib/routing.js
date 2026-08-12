@@ -21,14 +21,14 @@ const LEGACY_PROPERTY_ROUTES = {
   "124-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "124" },
   "126-n-mantua": { propertyName: "124/126 N Mantua", unitName: "126" },
   "126-n-mantua-main-unit": { propertyName: "124/126 N Mantua", unitName: "126" },
-  "127-s-pearl": { propertyName: "133 S Pearl" },
-  "127-s-pearl-up": { propertyName: "133 S Pearl", unitName: "UP" },
-  "127-s-pearl-down": { propertyName: "133 S Pearl", unitName: "DOWN" },
+  "127-s-pearl": { propertyName: "127 S Pearl" },
+  "127-s-pearl-up": { propertyName: "127 S Pearl", unitName: "UP" },
+  "127-s-pearl-down": { propertyName: "127 S Pearl", unitName: "DOWN" },
   "322-park": { propertyName: "310 Park", unitName: "AirBnB" },
 };
 
 const PUBLIC_PROPERTY_ROUTE_ALIASES = {
-  "127-s-pearl": "133-s-pearl",
+  "133-s-pearl": "127-s-pearl",
   "322-park": "310-park",
 };
 
@@ -126,7 +126,29 @@ export function getMaintenanceQrPath(token) {
 
 export function updateMaintenancePath({ replace = false } = {}) {
   const path = getMaintenancePath();
-  if (window.location.pathname !== path) {
+  if (window.location.pathname !== path || window.location.search) {
+    window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+  }
+}
+
+export function getMaintenancePreviewFromCurrentPath() {
+  if (!isMaintenanceRoute()) return null;
+  const params = new URL(window.location.href).searchParams;
+  if (params.get("preview") !== "tenant") return null;
+  return {
+    mode: "tenant",
+    propertyId: params.get("property") || "",
+    unitId: params.get("unit") || "",
+  };
+}
+
+export function updateMaintenancePreviewPath(preview, { replace = false } = {}) {
+  const url = new URL(getMaintenancePath(), window.location.origin);
+  url.searchParams.set("preview", preview.mode);
+  if (preview.propertyId) url.searchParams.set("property", preview.propertyId);
+  if (preview.unitId) url.searchParams.set("unit", preview.unitId);
+  const path = `${url.pathname}${url.search}`;
+  if (`${window.location.pathname}${window.location.search}` !== path) {
     window.history[replace ? "replaceState" : "pushState"]({}, "", path);
   }
 }

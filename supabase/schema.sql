@@ -1241,6 +1241,21 @@ where property.workspace_id = workspace.id
 
 commit;
 
+-- Correct the previously seeded Pearl Street address while retaining all
+-- dependent records on the same property UUID.
+begin;
+
+update public.properties property
+set name = '127 S Pearl',
+    street_address = '127 S Pearl St.',
+    updated_at = now()
+from public.workspaces workspace
+where property.workspace_id = workspace.id
+  and workspace.name = 'Tipton Rentals'
+  and property.name = '133 S Pearl';
+
+commit;
+
 alter table public.properties
   drop column if exists auditor_parcel_number;
 alter table public.items
