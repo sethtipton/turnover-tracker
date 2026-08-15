@@ -1,0 +1,2 @@
+[functions.submit-maintenance-request]
+verify_jwt = false

@@ -125,12 +125,13 @@ dl {
     align-items: center;
     justify-content: center;
     gap: var(--space-3);
+    font-size: var(--font-size-sm);
     padding: var(--space-4) var(--space-6);
     border: 1px solid transparent;
     border-radius: var(--radius-panel);
     background: var(--color-primary);
     color: var(--color-on-action);
-    font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     touch-action: manipulation;
     line-height: 1;

@@ -87,8 +87,8 @@ $$;
 alter table public.items enable trigger items_activity_log_trigger;
 
 update public.properties property
-set name = '133 S Pearl',
-    street_address = '133 S Pearl St.',
+set name = '127 S Pearl',
+    street_address = '127 S Pearl St.',
     updated_at = now()
 from public.workspaces workspace
 where property.workspace_id = workspace.id
@@ -112,7 +112,7 @@ from public.workspaces workspace,
   ('124/126 N Mantua', 5, '17-025-10-00-149-000'),
   ('469 Carthage', 6, '17-030-10-00-010-000'),
   ('458 W Main', 7, '17-025-20-00-069-000'),
-  ('133 S Pearl', 8, '17-025-20-00-074-000'),
+  ('127 S Pearl', 8, '17-025-20-00-074-000'),
   ('310 Park', 9, '17-025-10-00-163-000')
 ) as seed(name, sort_order, parcel_number)
 where property.workspace_id = workspace.id

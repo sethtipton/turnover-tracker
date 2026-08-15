@@ -17,7 +17,7 @@ describe("maintenance AI structured-output parsing", () => {
 
     expect(result.facts).toEqual(["The fan makes a rattling noise."]);
     expect(result.possible_causes).toEqual([{ text: "Motor or bearing wear", confidence: "medium" }]);
-    expect(result.proposed_items).toEqual([{ title: "Inspect bathroom exhaust fan", note: "Check noise source and airflow.", kind: "task", material_type: "none" }]);
+    expect(result.proposed_items).toEqual([{ title: "Inspect bathroom exhaust fan", note: "Check noise source and airflow.", kind: "task", material_type: "none", confidence: "low" }]);
   });
 
   it("splits a mixed walkthrough while preserving direct shopping and collect work", () => {
@@ -50,8 +50,8 @@ describe("maintenance AI structured-output parsing", () => {
 
     expect(result.summary).toBe("");
     expect(result.proposed_items).toEqual([
-      { title: "Bring ladder", note: "", kind: "material", material_type: "shopping" },
-      { title: "Inspect fan", note: "", kind: "task", material_type: "none" },
+      { title: "Bring ladder", note: "", kind: "material", material_type: "collect", confidence: "low" },
+      { title: "Inspect fan", note: "", kind: "task", material_type: "none", confidence: "low" },
     ]);
   });
 

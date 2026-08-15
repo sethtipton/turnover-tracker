@@ -52,14 +52,61 @@ export async function loadAdminMaintenanceDetail(requestId) {
       .order("created_at", { ascending: true })
     : { data: [], error: null };
   if (directItemsResult.error) throw directItemsResult.error;
+  const photoAttachments = (attachmentsResult.data || []).filter((attachment) => attachment.kind === "photo");
+  const attachmentIds = photoAttachments.map((attachment) => attachment.id);
+  const [childRequestsResult, attachmentLinksResult] = await Promise.all([
+    supabase
+      .from("maintenance_requests")
+      .select("id,title")
+      .eq("parent_request_id", requestId)
+      .order("created_at", { ascending: true }),
+    attachmentIds.length
+      ? supabase
+        .from("maintenance_attachment_case_links")
+        .select("id,attachment_id,maintenance_request_id")
+        .in("attachment_id", attachmentIds)
+      : supabase
+        .from("maintenance_attachment_case_links")
+        .select("id,attachment_id,maintenance_request_id")
+        .eq("maintenance_request_id", requestId),
+  ]);
+  if (childRequestsResult.error) throw childRequestsResult.error;
+  if (attachmentLinksResult.error) throw attachmentLinksResult.error;
+  const linkedAttachmentIds = [...new Set((attachmentLinksResult.data || []).map((link) => link.attachment_id))];
+  const linkedAttachmentsResult = linkedAttachmentIds.length
+    ? await supabase
+      .from("maintenance_attachments")
+      .select("*")
+      .in("id", linkedAttachmentIds)
+    : { data: [], error: null };
+  if (linkedAttachmentsResult.error) throw linkedAttachmentsResult.error;
   return {
     request: requestResult.data,
     entries: entriesResult.data || [],
     attachments: attachmentsResult.data || [],
+    attachmentLinks: attachmentLinksResult.data || [],
+    childRequests: childRequestsResult.data || [],
+    linkedAttachments: linkedAttachmentsResult.data || [],
     analyses: analysesResult.data || [],
     items: [...(requestItemsResult.data || []), ...(directItemsResult.data || [])],
     events: eventsResult.data || [],
   };
+}
+
+export async function setMaintenanceAttachmentCaseLinks({ attachmentId, maintenanceRequestIds }) {
+  const { error: deleteError } = await supabase
+    .from("maintenance_attachment_case_links")
+    .delete()
+    .eq("attachment_id", attachmentId);
+  if (deleteError) throw deleteError;
+  if (maintenanceRequestIds.length === 0) return;
+  const { error: insertError } = await supabase
+    .from("maintenance_attachment_case_links")
+    .insert(maintenanceRequestIds.map((maintenanceRequestId) => ({
+      attachment_id: attachmentId,
+      maintenance_request_id: maintenanceRequestId,
+    })));
+  if (insertError) throw insertError;
 }
 
 export async function loadTenantMaintenanceDetail(requestId) {
@@ -151,6 +198,47 @@ export async function submitMaintenanceRequest({
     // AI call fails after the permanent case has been created.
     throw new Error(`Request saved, but additional processing failed: ${sourceError.message}`);
   }
+}
+
+export async function inspectPublicMaintenanceCapability(token) {
+  const { data, error } = await supabase.functions.invoke("submit-maintenance-request", {
+    body: { action: "inspect", token },
+  });
+  if (error) {
+    const detail = await readFunctionError(error);
+    throw new Error(detail || "This maintenance link is unavailable.");
+  }
+  if (!data?.propertyName || !data?.unitName) throw new Error("This maintenance link is unavailable.");
+  return data;
+}
+
+export async function submitPublicMaintenanceRequest({
+  token,
+  description = "",
+  contactName = "",
+  contactEmail = "",
+  contactPhone = "",
+  photoFiles = [],
+  audioFile = null,
+}) {
+  const form = new FormData();
+  form.set("action", "submit");
+  form.set("token", token);
+  form.set("description", description);
+  form.set("contactName", contactName);
+  form.set("contactEmail", contactEmail);
+  form.set("contactPhone", contactPhone);
+  form.set("website", "");
+  photoFiles.forEach((file) => form.append("photos", file, file.name));
+  if (audioFile) form.append("audio", audioFile, audioFile.name);
+
+  const { data, error } = await supabase.functions.invoke("submit-maintenance-request", { body: form });
+  if (error) {
+    const detail = await readFunctionError(error);
+    throw new Error(detail || "We couldn’t send that request. Please try again.");
+  }
+  if (!data?.received) throw new Error("We couldn’t send that request. Please try again.");
+  return data;
 }
 
 export async function addMaintenanceInformation({ request, user, content = "", audioFile = null, photoFiles = [], visibility }) {

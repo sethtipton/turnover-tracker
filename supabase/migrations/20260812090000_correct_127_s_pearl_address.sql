@@ -9,6 +9,6 @@ set name = '127 S Pearl',
 from public.workspaces workspace
 where property.workspace_id = workspace.id
   and workspace.name = 'Tipton Rentals'
-  and property.name = '133 S Pearl';
+  and property.name = '127 S Pearl';
 
 commit;

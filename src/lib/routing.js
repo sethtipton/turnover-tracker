@@ -28,7 +28,6 @@ const LEGACY_PROPERTY_ROUTES = {
 };
 
 const PUBLIC_PROPERTY_ROUTE_ALIASES = {
-  "133-s-pearl": "127-s-pearl",
   "322-park": "310-park",
 };
 
@@ -106,13 +105,18 @@ export function isMaintenanceRoute() {
 }
 
 export function isMaintenanceQrRoute() {
-  return getCurrentRouteParts({ preserveCase: true })[0]?.toLowerCase() === "m";
+  const routeParts = getCurrentRouteParts({ preserveCase: true });
+  return routeParts[0]?.toLowerCase() === "maintenance"
+    && routeParts[1]?.toLowerCase() === "q"
+    && routeParts.length === 3;
 }
 
 export function getMaintenanceQrTokenFromCurrentPath() {
   const routeParts = getCurrentRouteParts({ preserveCase: true });
-  return routeParts[0]?.toLowerCase() === "m" && routeParts.length === 2
-    ? routeParts[1]
+  return routeParts[0]?.toLowerCase() === "maintenance"
+    && routeParts[1]?.toLowerCase() === "q"
+    && routeParts.length === 3
+    ? routeParts[2]
     : "";
 }
 
@@ -121,7 +125,7 @@ export function getMaintenancePath() {
 }
 
 export function getMaintenanceQrPath(token) {
-  return `${basePath}m/${encodeURIComponent(token)}/`;
+  return `${basePath}maintenance/q/${encodeURIComponent(token)}/`;
 }
 
 export function updateMaintenancePath({ replace = false } = {}) {

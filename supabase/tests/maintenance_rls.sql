@@ -1,10 +1,8 @@
 begin;
-select plan(21);
+select plan(25);
 
-select ok(
-  not has_function_privilege('anon', 'public.get_my_maintenance_qr_context(text)', 'execute'),
-  'anonymous callers cannot execute the QR unit-context resolver'
-);
+select ok(not has_function_privilege('anon', 'public.resolve_public_maintenance_capability(text)', 'execute'), 'anonymous callers cannot execute the QR capability resolver');
+select ok(not has_function_privilege('anon', 'public.claim_public_maintenance_submission(text)', 'execute'), 'anonymous callers cannot execute the QR submission claim RPC');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values
@@ -41,6 +39,15 @@ insert into public.property_members (workspace_id, property_id, email, role)
 values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 'property-admin@example.test', 'admin')
 on conflict (property_id, email) do update set role = excluded.role;
 
+set local role anon;
+select is_empty('select * from public.units', 'anonymous callers cannot enumerate units');
+select is_empty('select * from public.properties', 'anonymous callers cannot enumerate properties');
+select throws_ok(
+  $$insert into public.maintenance_requests (workspace_id, property_id, unit_id, source_type, title) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 'cccccccc-cccc-cccc-cccc-ccccccccccc1', 'qr-public', 'Forged public request')$$,
+  '42501', null, 'anonymous callers cannot insert public requests directly'
+);
+reset role;
+
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","email":"tenant-a@example.test","role":"authenticated"}', true);
 set local role authenticated;
@@ -52,17 +59,6 @@ insert into public.maintenance_requests (
 );
 
 select ok(exists (select 1 from public.maintenance_requests where id = '99999999-9999-9999-9999-999999999991'), 'tenant A can read their own request');
-
-select ok(exists (
-  select 1
-  from public.get_my_maintenance_qr_context((
-    select maintenance_qr_token
-    from public.units
-    where id = 'cccccccc-cccc-cccc-cccc-ccccccccccc1'
-  )) context
-  where context.tenant_membership_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1'
-    and context.access_role = 'tenant'
-), 'tenant A can resolve their own unit QR code');
 
 insert into public.maintenance_request_entries (
   id, maintenance_request_id, author_type, author_id, author_email, entry_type, visibility, content
@@ -111,11 +107,6 @@ select is_empty(
   'tenant B cannot read tenant A request, even in the same property'
 );
 
-select is_empty(
-  $$select * from public.get_my_maintenance_qr_context((select maintenance_qr_token from public.units where id = 'cccccccc-cccc-cccc-cccc-ccccccccccc1'))$$,
-  'tenant B cannot resolve tenant A unit details from a copied QR token'
-);
-
 select throws_ok(
   $$insert into public.maintenance_requests (workspace_id, property_id, unit_id, tenant_membership_id, source_type, submitter_id, submitter_email, title) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 'cccccccc-cccc-cccc-cccc-ccccccccccc1', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1', 'tenant-qr', '22222222-2222-2222-2222-222222222222', 'tenant-b@example.test', 'Forged QR request')$$,
   '42501',
@@ -144,15 +135,23 @@ set local role authenticated;
 select ok(exists (select 1 from public.maintenance_requests where id = '99999999-9999-9999-9999-999999999991'), 'property admin can read a request in their authorized property');
 select ok(exists (select 1 from public.workspaces where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'), 'property admin can read only enough workspace metadata to reach the maintenance console');
 select is_empty('select * from public.properties where id = ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2''', 'property admin cannot read unassigned properties');
+select ok(not exists (
+  select 1 from information_schema.columns
+  where table_schema = 'public' and table_name = 'units' and column_name = 'maintenance_qr_token'
+), 'units no longer persist plaintext maintenance QR tokens');
+
+select ok(
+  public.generate_unit_maintenance_access('cccccccc-cccc-cccc-cccc-ccccccccccc1') ~ '^[A-Za-z0-9_-]{43}$',
+  'property admin receives a newly generated 256-bit capability exactly once'
+);
 select ok(exists (
-  select 1
-  from public.get_my_maintenance_qr_context((
-    select maintenance_qr_token
-    from public.units
-    where id = 'cccccccc-cccc-cccc-cccc-ccccccccccc1'
-  )) context
-  where context.access_role = 'admin'
-), 'property admin can resolve a QR code for an authorized property');
+  select 1 from public.units
+  where id = 'cccccccc-cccc-cccc-cccc-ccccccccccc1'
+    and maintenance_access_enabled
+    and maintenance_access_token_hash ~ '^[a-f0-9]{64}$'
+), 'only the public capability hash is persisted on the unit');
+select public.disable_unit_maintenance_access('cccccccc-cccc-cccc-cccc-ccccccccccc1');
+select ok(not (select maintenance_access_enabled from public.units where id = 'cccccccc-cccc-cccc-cccc-ccccccccccc1'), 'property admin can immediately disable a capability');
 
 select * from finish();
 rollback;

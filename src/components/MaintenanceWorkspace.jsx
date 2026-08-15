@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, CirclePlus, FileAudio, ListChecks, Mic, RefreshCw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, CirclePlus, FileAudio, ListChecks, Mic, RefreshCw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { addItem, deleteItem, loadItems, uploadAttachment } from "../lib/data";
 import {
@@ -13,6 +13,7 @@ import {
   rejectMaintenanceItem,
   reopenMaintenanceRequest,
   resolveMaintenanceRequest,
+  setMaintenanceAttachmentCaseLinks,
   submitMaintenanceRequest,
 } from "../lib/maintenance";
 import { formatBytes, formatDuration, getAttachmentKind } from "../lib/media";
@@ -27,7 +28,7 @@ const emptyQuickAddDraft = {
   material_type: "shopping",
 };
 
-export function MaintenanceWorkspace({ user, workspace, properties, units, initialPropertyId, initialUnitId, onClose, onPreview }) {
+export function MaintenanceWorkspace({ user, workspace, properties, units, initialPropertyId, initialUnitId, onPreview }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState(initialPropertyId || properties[0]?.id || "");
   const [selectedUnitId, setSelectedUnitId] = useState(initialUnitId || "");
   const [requests, setRequests] = useState([]);
@@ -35,9 +36,11 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showMaintenanceOverview, setShowMaintenanceOverview] = useState(false);
 
   const propertyUnits = useMemo(() => units.filter((unit) => unit.property_id === selectedPropertyId), [selectedPropertyId, units]);
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
+  const selectedUnit = propertyUnits.find((unit) => unit.id === selectedUnitId);
   const openRequests = requests.filter((request) => request.status !== "resolved");
   const resolvedRequests = requests.filter((request) => request.status === "resolved");
 
@@ -130,6 +133,19 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
     }
   }
 
+  async function handleAttachmentLinks(attachmentId, maintenanceRequestIds) {
+    setBusy(true);
+    try {
+      await setMaintenanceAttachmentCaseLinks({ attachmentId, maintenanceRequestIds });
+      await refresh();
+      setMessage("Photo links updated.");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function retry() {
     if (!detail?.request) return;
     setBusy(true);
@@ -181,13 +197,11 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
     <section className="maintenance-workspace" aria-labelledby="maintenance-title">
       <header className="maintenance-header">
         <div>
-          <p className="eyebrow">Property maintenance</p>
-          <h2 id="maintenance-title"><Sparkles size={22} aria-hidden="true" /> Maintenance case files</h2>
-          <p>Use Maintenance to keep repair requests and walkthrough findings organized in one place. Tenants can submit an issue with a note, photos, or a voice message from their maintenance link; each submission becomes a case file they can revisit to see its status. Property admins can review the request, add internal details, approve or ignore AI-suggested tasks and materials, and close the case when the issue is resolved. For on-site inspections, open Start a maintenance report, record a walkthrough, and let the app split distinct observations into reviewable cases; use the Tasks tab for everyday work that does not need a tenant-facing case file.</p>
-        </div>
-        <div className="maintenance-header-actions">
-          <button className="ghost" type="button" onClick={() => openPreview("tenant")} disabled={!selectedPropertyId || propertyUnits.length === 0}><ShieldCheck size={17} aria-hidden="true" /> Preview signed-in tenant</button>
-          <button className="ghost" type="button" onClick={onClose}><ArrowLeft size={17} aria-hidden="true" /> Return to property workspace</button>
+          <h2 id="maintenance-title"><Sparkles size={22} aria-hidden="true" /> Maintenance case files <button className="maintenance-title-toggle" type="button" aria-expanded={showMaintenanceOverview} aria-controls="maintenance-overview" onClick={() => setShowMaintenanceOverview((current) => !current)}><ChevronDown size={20} aria-hidden="true" /><span className="visually-hidden">{showMaintenanceOverview ? "Hide" : "Show"} maintenance overview</span></button></h2>
+          <div id="maintenance-overview" hidden={!showMaintenanceOverview}>
+            <p>Use Maintenance to keep repair requests and walkthrough findings organized in one place. Tenants can submit an issue with a note, photos, or a voice message from their maintenance link; each submission becomes a case file they can revisit to see its status. Property admins can review the request, add internal details, approve or ignore AI-suggested tasks and materials, and close the case when the issue is resolved. For on-site inspections, open Start a maintenance report, record a walkthrough, and let the app split distinct observations into reviewable cases; use the Tasks tab for everyday work that does not need a tenant-facing case file.</p>
+            <button className="ghost" type="button" onClick={() => openPreview("tenant")} disabled={!selectedPropertyId || propertyUnits.length === 0}><ShieldCheck size={17} aria-hidden="true" /> Preview tenant form <ArrowRight size={17} aria-hidden="true" /></button>
+          </div>
         </div>
       </header>
 
@@ -197,10 +211,12 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
       </section>
 
       {selectedProperty && (
-        <details className="admin-intake-disclosure">
-          <summary>Start a maintenance request</summary>
-          <AdminRequestComposer propertyId={selectedProperty.id} unitId={selectedUnitId} workspaceId={workspace.id} busy={busy} onSubmit={handleNewRequest} onMessage={setMessage} />
-        </details>
+        <div className="maintenance-intake-actions">
+          <details className="admin-intake-disclosure">
+            <summary><ChevronRight className="admin-intake-disclosure-icon" size={20} aria-hidden="true" /><span className="admin-intake-disclosure-copy"><span>Add maintenance to</span><span className="admin-intake-context">{selectedProperty.name} · {selectedUnit?.name || "Whole property"}</span></span></summary>
+            <AdminRequestComposer propertyId={selectedProperty.id} unitId={selectedUnitId} workspaceId={workspace.id} busy={busy} onSubmit={handleNewRequest} onMessage={setMessage} />
+          </details>
+        </div>
       )}
       <div className="maintenance-content-grid">
         <nav className="maintenance-case-list" aria-label="Maintenance requests">
@@ -208,7 +224,7 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
           {openRequests.length === 0 ? <p className="empty">No open maintenance requests in this scope.</p> : <CaseFileList requests={openRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} />}
           {resolvedRequests.length > 0 && <details className="resolved-case-list"><summary>Resolved cases ({resolvedRequests.length})</summary><CaseFileList requests={resolvedRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} /></details>}
         </nav>
-        <AdminCaseFile detail={detail} properties={properties} units={units} busy={busy} onRetry={retry} onResolve={handleCaseResolution} onItemAction={handleItemAction} onAddInformation={handleAddInformation} message={message} />
+        <AdminCaseFile detail={detail} properties={properties} units={units} busy={busy} onRetry={retry} onResolve={handleCaseResolution} onItemAction={handleItemAction} onAddInformation={handleAddInformation} onAttachmentLinksChange={handleAttachmentLinks} message={message} />
       </div>
       {selectedProperty && <MaintenanceQrControls property={selectedProperty} selectedUnit={propertyUnits.find((unit) => unit.id === selectedUnitId) || null} propertyUnits={propertyUnits} />}
     </section>
@@ -238,7 +254,7 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
   async function submit(event) {
     event.preventDefault();
     if (!description.trim() && !recording && photos.length === 0) return;
-    await onSubmit({ description, audioFile: recording?.file || null, photoFiles: photos });
+    await onSubmit({ description: recording ? "" : description, audioFile: recording?.file || null, photoFiles: photos });
     setDescription("");
     setPhotos([]);
     if (recording) removeRecording(recording.id);
@@ -290,36 +306,66 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
     }
   }
 
-  return <section className="admin-intake" aria-label="Create a maintenance request">
-    <div className="admin-intake-overview">
-      <button type="button" className={state === "recording" ? "recording" : ""} onClick={state === "recording" ? stop : start}><Mic size={17} aria-hidden="true" /> {state === "recording" ? "Stop recording" : "Record walkthrough"}</button>
-      <p>Creates a permanent case file for the selected property or unit. A voice walkthrough can still split into multiple cases.</p>
-      <details className="admin-walkthrough-help">
-        <summary>How to use a walkthrough</summary>
-      <p>Use this during a property walkthrough. Record your observations as you go, including maintenance issues and anything needed to address them. After you submit the recording, distinct issues are organized into separate case files with reviewable task, shopping, and collect/bring suggestions.</p></details>
-      </div>
-      <form onSubmit={submit}>
-        <label htmlFor="admin-intake-description">
-          <span>What should we know? <small>Optional - record a walkthrough or add photos instead.</small></span>
-          <textarea id="admin-intake-description" name="description" value={description} onChange={(event) => setDescription(event.target.value)} rows="3" maxLength="4000" placeholder="Example: The bathroom fan is rattling and the faucet drips." />
-        </label>
-        <div className="admin-intake-actions">
-          <label className="tenant-upload-button" htmlFor="admin-intake-photos">Add photos<input id="admin-intake-photos" name="photos" type="file" accept="image/*" multiple onChange={(event) => setPhotos([...event.target.files])} /></label>
-          <button type="button" className="ghost" onClick={() => setQuickAddOpen((open) => !open)} aria-expanded={quickAddOpen} aria-controls="maintenance-quick-add"><CirclePlus size={17} aria-hidden="true" /> Add 1 Task or Material</button>
-          <button type="submit" disabled={busy}><Sparkles size={17} aria-hidden="true" /> {busy ? "Creating…" : "Create request and analyze"}</button>
+  return <section className="admin-intake" aria-label="Add maintenance">
+      <header className="admin-intake-heading">
+        <div>
+          <p>Capture one issue or several. We&apos;ll organize what you submit into separate maintenance cases for review.</p>
         </div>
-        {recording && <p className="tenant-recording"><FileAudio size={17} aria-hidden="true" /> Recording ready · {formatDuration(recording.durationMs)} · {formatBytes(recording.size)} <button type="button" onClick={() => removeRecording(recording.id)}>Remove</button></p>}{photos.length > 0 && <p className="tenant-file-count">{photos.length} photo{photos.length === 1 ? "" : "s"} ready.</p>}
-      </form>
-      <div id="maintenance-quick-add" hidden={!quickAddOpen}>
-        <QuickAddPanel draft={quickAddDraft} busy={quickAddBusy} onDraftChange={(patch) => setQuickAddDraft((current) => ({ ...current, ...patch }))} onSubmit={addQuickWork} isOpen onClose={() => setQuickAddOpen(false)} />
-      </div>
+      </header>
+      <ol className="admin-intake-workflow" aria-label="Maintenance intake workflow">
+        <li><strong>Capture</strong><span>Notes, photos, or voice</span></li>
+        <li><strong>Organize</strong><span>Observations become cases</span></li>
+        <li><strong>Review</strong><span>Check suggested work</span></li>
+        <li><strong>Approve</strong><span>Add only what you want done</span></li>
+      </ol>
+      <details className="admin-intake-choice admin-quick-add" name="admin-maintenance-method" open={quickAddOpen} onToggle={(event) => setQuickAddOpen(event.currentTarget.open)}>
+        <summary><span className="admin-intake-choice-icons"><ChevronRight className="admin-intake-choice-icon" size={20} aria-hidden="true" /></span><span><strong>Quick add</strong><small>Already know exactly what needs to be done or purchased? Add it directly.</small></span><CirclePlus className="admin-intake-choice-workflow-icon" size={19} aria-hidden="true" /></summary>
+        <div id="maintenance-quick-add">
+          <QuickAddPanel variant="maintenance" draft={quickAddDraft} busy={quickAddBusy} onDraftChange={(patch) => setQuickAddDraft((current) => ({ ...current, ...patch }))} onSubmit={addQuickWork} isOpen onClose={() => setQuickAddOpen(false)} />
+        </div>
+      </details>
+      <details className="admin-intake-choice admin-walkthrough-option" name="admin-maintenance-method">
+        <summary><span className="admin-intake-choice-icons"><ChevronRight className="admin-intake-choice-icon" size={20} aria-hidden="true" /></span><span><strong>Walkthrough</strong><small>Record, describe, or photograph what you found.</small></span><Mic className="admin-intake-choice-workflow-icon" size={19} aria-hidden="true" /></summary>
+        <div className="admin-intake-choice-content">
+          <div className="admin-walkthrough-capture">
+            <p>Talk through issues as you move through the property. One recording can cover multiple rooms or repairs.</p>
+            <button type="button" className={state === "recording" ? "recording" : ""} onClick={state === "recording" ? stop : start}><Mic size={17} aria-hidden="true" /> {state === "recording" ? "Stop recording" : "Record a walkthrough"}</button>
+            <details className="admin-walkthrough-help">
+              <summary>Tips for better walkthroughs</summary>
+              <ul className="admin-walkthrough-steps">
+                <li>Start each observation with its location, then describe what you see, hear, smell, or notice.</li>
+                <li>Mention urgency, access needs, tools, parts, or materials when useful.</li>
+                <li>Say “next issue” or pause briefly between unrelated observations.</li>
+              </ul>
+              <p>One recording can cover a room, unit, or entire property. Long recordings may need to be split if the audio file exceeds 50 MB.</p>
+            </details>
+          </div>
+          <form className="admin-maintenance-form" id="admin-maintenance-form" onSubmit={submit}>
+            {!recording ? <label className="admin-intake-field" htmlFor="admin-intake-description">
+              <span>Describe what you found <small className="optional-label">Optional</small></span>
+              <small className="field-hint" id="admin-intake-description-help">Add one issue or several. Unrelated observations can be separated into individual maintenance cases after submission.</small>
+              <textarea id="admin-intake-description" name="description" value={description} onChange={(event) => setDescription(event.target.value)} rows="3" maxLength="4000" aria-describedby="admin-intake-description-help" placeholder="Bathroom fan rattles when running. Faucet drips at the base." />
+            </label> : <p className="field-hint">Your walkthrough is ready. Add photos if useful, then create the maintenance request.</p>}
+          </form>
+          <div className="admin-intake-media">
+            <p className="admin-intake-photo-help" id="admin-intake-photo-help">Photos stay with this maintenance intake. During review, you can link each photo to one or more generated case files. Image files only; multiple photos are supported.</p>
+            <label className="tenant-upload-button" htmlFor="admin-intake-photos"><Camera size={17} aria-hidden="true" /> Add photos<input id="admin-intake-photos" name="photos" type="file" accept="image/*" multiple aria-describedby="admin-intake-photo-help" onChange={(event) => setPhotos([...event.target.files])} /></label>
+            {recording && <p className="tenant-recording"><FileAudio size={17} aria-hidden="true" /> Recording ready · {formatDuration(recording.durationMs)} · {formatBytes(recording.size)} <button type="button" onClick={() => removeRecording(recording.id)}>Remove</button></p>}
+            {photos.length > 0 && <p className="tenant-file-count">{photos.length} photo{photos.length === 1 ? "" : "s"} attached.</p>}
+          </div>
+          <div className="admin-intake-submit">
+            <p>We&apos;ll organize the submission and suggest follow-up work for you to review.</p>
+            <button type="submit" form="admin-maintenance-form" disabled={busy}><Sparkles size={17} aria-hidden="true" /> {busy ? "Creating…" : "Create maintenance request"}</button>
+          </div>
+        </div>
+      </details>
       </section>;
 }
 
-function AdminCaseFile({ detail, properties, units, busy, onRetry, onResolve, onItemAction, onAddInformation, message }) {
+function AdminCaseFile({ detail, busy, onRetry, onResolve, onItemAction, onAddInformation, onAttachmentLinksChange, message }) {
   const [urls, setUrls] = useState({});
   useEffect(() => {
-    const missing = (detail?.attachments || []).filter((attachment) => !urls[attachment.storage_path]);
+    const missing = [...(detail?.attachments || []), ...(detail?.linkedAttachments || [])].filter((attachment) => !urls[attachment.storage_path]);
     if (missing.length === 0) return;
     Promise.all(missing.map(async (attachment) => [attachment.storage_path, await getMaintenanceAttachmentUrl(attachment.storage_path)]))
       .then((entries) => setUrls((current) => ({ ...current, ...Object.fromEntries(entries) })))
@@ -327,16 +373,57 @@ function AdminCaseFile({ detail, properties, units, busy, onRetry, onResolve, on
   }, [detail, urls]);
 
   if (!detail) return <section className="maintenance-case-file maintenance-case-empty"><ListChecks size={25} aria-hidden="true" /><p>Select a case file to inspect its history and proposed work.</p>{message && <p className="message" role="status">{message}</p>}</section>;
-  const { request, entries, analyses, items, events } = detail;
-  const submitterType = request.tenant_membership_id ? "Tenant" : "Administrator";
+  const { request, entries, attachments, attachmentLinks, childRequests, linkedAttachments, analyses, items, events } = detail;
+  const submitterType = request.source_type === "qr-public" ? "QR visitor" : request.tenant_membership_id ? "Tenant" : "Administrator";
+  const contactEmail = request.reporter_email || request.submitter_email;
+  const contactName = request.reporter_name || null;
+  const contactPhone = request.reporter_phone || null;
   const hasDistinctDescription = request.original_description?.trim()
     && request.original_description.trim().toLocaleLowerCase() !== request.title?.trim().toLocaleLowerCase();
   const isResolved = request.status === "resolved";
-  return <section className="maintenance-case-file" aria-labelledby="case-file-title"><header><div><p className={`tenant-status tenant-status-${request.status}`}>{REQUEST_STATUS_LABELS[request.status] || request.status}</p><h3 id="case-file-title">{request.title}</h3>{hasDistinctDescription && <p>{request.original_description}</p>}</div><div className="case-file-actions">{!isResolved && <button className="ghost" type="button" onClick={onRetry} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> {request.processing_status === "failed" ? "Retry analysis" : "Reanalyze"}</button>}<button className="ghost" type="button" onClick={() => onResolve(isResolved ? "reopen" : "resolve")} disabled={busy}>{isResolved ? "Reopen case" : "Close case"}</button></div></header><dl className="case-metadata"><div><dt>Property &amp; unit</dt><dd>{getRequestScopeLabel(request, properties, units)}</dd></div><div><dt>Submitted by</dt><dd>{submitterType}</dd></div><div><dt>Contact email</dt><dd>{request.submitter_email ? <a href={`mailto:${request.submitter_email}`}>{request.submitter_email}</a> : "Not provided"}</dd></div><div><dt>Source</dt><dd>{getRequestSourceLabel(request.source_type)}</dd></div><div><dt>Submitted</dt><dd><time dateTime={request.created_at}>{formatCaseDate(request.created_at)}</time></dd></div></dl>{request.processing_error && <p className="maintenance-error" role="alert">{request.processing_error}</p>}<section className="case-section"><h4>Case history</h4><ol className="case-timeline">{entries.map((entry) => <li key={entry.id}><strong>{entry.entry_type === "audio" ? "Voice recording" : entry.entry_type === "photo" ? "Photo added" : entry.author_type === "tenant" ? "Tenant information" : "Information added"}</strong><p>{entry.transcript || entry.content || "Media attached"}</p></li>)}</ol></section>{!isResolved && <AdminAdditionalInfo request={request} busy={busy} onSubmit={onAddInformation} />}{analyses.map((analysis, index) => <AnalysisCard key={analysis.id} analysis={analysis} items={items.filter((item) => item.maintenance_analysis_id === analysis.id)} busy={busy} onItemAction={onItemAction} defaultOpen={index === 0} />)}<details className="case-section case-history-details"><summary>Request history</summary><ol className="case-timeline compact">{events.map((event) => <li key={event.id}><strong>{event.label}</strong><time dateTime={event.created_at}>{formatCaseDate(event.created_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></li>)}</ol></details>{message && <p className="message" role="status">{message}</p>}</section>;
+  const sourceLabel = getRequestSourceLabel(request.source_type);
+  return <section className="maintenance-case-file" aria-labelledby="case-file-title">
+    <header>
+      <div>
+        <p className={`tenant-status tenant-status-${request.status}`}>{REQUEST_STATUS_LABELS[request.status] || request.status}</p>
+        <h3 id="case-file-title">{request.title}</h3>
+        {hasDistinctDescription && <p>{request.original_description}</p>}
+        <div className="case-ticket-footer">
+          <p><span>Submitted by</span> <strong>{submitterType}</strong></p>
+          {(contactName || contactEmail || contactPhone) && <p><span>Contact</span> {contactName && <strong>{contactName}</strong>}{contactEmail && <a href={`mailto:${contactEmail}`}>{contactEmail}</a>}{contactPhone && <a href={`tel:${contactPhone}`}>{contactPhone}</a>}</p>}
+          <p>{sourceLabel} <span aria-hidden="true">·</span> <time dateTime={request.created_at}>{formatCaseDate(request.created_at)}</time></p>
+        </div>
+      </div>
+      <div className="case-file-actions">
+        {!isResolved && <button className="ghost" type="button" onClick={onRetry} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> {request.processing_status === "failed" ? "Retry analysis" : "Reanalyze"}</button>}
+        <button className="ghost" type="button" onClick={() => onResolve(isResolved ? "reopen" : "resolve")} disabled={busy}>{isResolved ? "Reopen case" : "Close case"}</button>
+      </div>
+    </header>
+    {request.processing_error && <p className="maintenance-error" role="alert">{request.processing_error}</p>}
+    {request.source_type === "admin-walkthrough" && <WalkthroughPhotoLinks attachments={attachments} attachmentLinks={attachmentLinks} childRequests={childRequests} urls={urls} busy={busy} onChange={onAttachmentLinksChange} />}
+    {request.parent_request_id && <LinkedWalkthroughPhotos attachments={linkedAttachments} urls={urls} />}
+    <section className="case-section"><h4>Case history</h4><ol className="case-timeline">{entries.map((entry) => <li key={entry.id}><strong>{entry.entry_type === "audio" ? "Voice recording" : entry.entry_type === "photo" ? "Photo added" : entry.author_type === "tenant" ? "Tenant information" : "Information added"}</strong><p>{entry.transcript || entry.content || "Media attached"}</p></li>)}</ol></section>
+    {!isResolved && <AdminAdditionalInfo request={request} busy={busy} onSubmit={onAddInformation} />}
+    {analyses.map((analysis, index) => <AnalysisCard key={analysis.id} analysis={analysis} items={items.filter((item) => item.maintenance_analysis_id === analysis.id)} busy={busy} onItemAction={onItemAction} defaultOpen={index === 0} />)}
+    <details className="case-section case-history-details"><summary>Request history</summary><ol className="case-timeline compact">{events.map((event) => <li key={event.id}><strong>{event.label}</strong><time dateTime={event.created_at}>{formatCaseDate(event.created_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></li>)}</ol></details>
+    {message && <p className="message" role="status">{message}</p>}
+  </section>;
+}
+
+function WalkthroughPhotoLinks({ attachments, attachmentLinks, childRequests, urls, busy, onChange }) {
+  const photos = attachments.filter((attachment) => attachment.kind === "photo");
+  if (photos.length === 0 || childRequests.length === 0) return null;
+  return <section className="case-section walkthrough-photo-links" aria-labelledby="walkthrough-photo-links-title"><h4 id="walkthrough-photo-links-title">Link walkthrough photos</h4><p>Photos stay with this walkthrough. Select each generated case that the photo supports.</p><ul role="list">{photos.map((photo) => { const selected = new Set(attachmentLinks.filter((link) => link.attachment_id === photo.id).map((link) => link.maintenance_request_id)); return <li key={photo.id}>{urls[photo.storage_path] && <img src={urls[photo.storage_path]} alt={photo.file_name} />}<fieldset><legend>{photo.file_name}</legend>{childRequests.map((child) => <label key={child.id}><input type="checkbox" checked={selected.has(child.id)} disabled={busy} onChange={(event) => onChange(photo.id, event.target.checked ? [...selected, child.id] : [...selected].filter((id) => id !== child.id))} /> {child.title}</label>)}</fieldset></li>; })}</ul></section>;
+}
+
+function LinkedWalkthroughPhotos({ attachments, urls }) {
+  if (attachments.length === 0) return null;
+  return <section className="case-section linked-walkthrough-photos" aria-labelledby="linked-walkthrough-photos-title"><h4 id="linked-walkthrough-photos-title">Linked walkthrough photos</h4><div>{attachments.map((attachment) => urls[attachment.storage_path] ? <a href={urls[attachment.storage_path]} target="_blank" rel="noreferrer" key={attachment.id}><img src={urls[attachment.storage_path]} alt={attachment.file_name} /></a> : null)}</div></section>;
 }
 
 function getRequestSourceLabel(sourceType) {
   return {
+    "qr-public": "Public QR request",
     "tenant-text": "Tenant typed request",
     "tenant-audio": "Tenant voice request",
     "tenant-qr": "Tenant QR request",

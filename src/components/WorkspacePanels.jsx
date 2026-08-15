@@ -186,19 +186,24 @@ export function FiltersBar({ query, statusFilter, onQueryChange, onStatusChange 
   );
 }
 
-export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, onClose }) {
+export function QuickAddPanel({ variant = "default", draft, busy, onDraftChange, onSubmit, isOpen, onClose }) {
   const [imageFile, setImageFile] = useState(null);
   const [imageInputKey, setImageInputKey] = useState(0);
+  const isMaintenanceQuickAdd = variant === "maintenance";
+  const itemLabel = draft.kind === "material" ? "Material" : isMaintenanceQuickAdd ? "Task" : "Item";
+  const itemPlaceholder = draft.kind === "material" ? "What needs to be purchased or brought?" : "What needs to be done?";
 
   return (
-    <section className="panel add-panel" id="add-work-panel" aria-labelledby="add-work-title" hidden={!isOpen}>
+    <section className="panel add-panel" id="add-work-panel" aria-labelledby={isMaintenanceQuickAdd ? undefined : "add-work-title"} hidden={!isOpen}>
       <div className="add-work-content" id="add-work-content">
-        <div className="add-work-heading">
-          <h2 id="add-work-title">Add tasks or materials</h2>
+        {!isMaintenanceQuickAdd && <div className="add-work-heading">
+          <div>
+            <h2 id="add-work-title">Add tasks or materials</h2>
+          </div>
           <button className="icon-button add-work-close" type="button" onClick={onClose} aria-label="Close add">
             <X size={17} aria-hidden="true" />
           </button>
-        </div>
+        </div>}
         <form
           className={draft.kind === "material" ? "add-form has-material-type" : "add-form"}
           onSubmit={async (event) => {
@@ -211,7 +216,7 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
           }}
         >
           <label className="form-field" htmlFor="new-item-kind">
-            <span>Type</span>
+            <span>{isMaintenanceQuickAdd ? "Add a" : "Type"}</span>
             <select
               id="new-item-kind"
               name="kind"
@@ -237,26 +242,26 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
             </label>
           )}
           <label className="form-field" htmlFor="new-item-title">
-            <span>Item</span>
+            <span>{itemLabel}</span>
             <input
               id="new-item-title"
               name="title"
               value={draft.title}
               onChange={(event) => onDraftChange({ title: event.target.value })}
-              placeholder="What needs to be done?"
+              placeholder={itemPlaceholder}
               enterKeyHint="done"
               maxLength="140"
               required
             />
           </label>
           <label className="form-field" htmlFor="new-item-note">
-            <span>Note <span className="optional-label">optional</span></span>
+            <span>{isMaintenanceQuickAdd ? "Details" : "Note"} <span className="optional-label">optional</span></span>
             <input
               id="new-item-note"
               name="note"
               value={draft.note}
               onChange={(event) => onDraftChange({ note: event.target.value })}
-              placeholder="Add useful details"
+              placeholder={isMaintenanceQuickAdd ? "Add location, size, color, model, quantity, or other useful details." : "Add useful details"}
               maxLength="500"
             />
           </label>
@@ -272,7 +277,7 @@ export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, on
               onChange={(event) => setImageFile(event.target.files?.[0] || null)}
             />
           </label>
-          <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> Add</button>
+          <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> {isMaintenanceQuickAdd ? `Add ${draft.kind}` : "Add"}</button>
         </form>
       </div>
     </section>

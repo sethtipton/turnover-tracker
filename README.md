@@ -69,11 +69,12 @@ Workspace access is stored in `public.workspace_members`. The initial Tipton Ren
 
 Do not put an OpenAI API key in any `VITE_` environment variable. Vite variables are bundled into the public browser app, so the key must stay server-side.
 
-The app uses Supabase Edge Functions at `supabase/functions/draft-tasks`, `supabase/functions/draft-listing-copy`, and `supabase/functions/process-maintenance-request` to keep OpenAI calls server-side. They read:
+The app uses Supabase Edge Functions at `supabase/functions/draft-tasks`, `supabase/functions/draft-listing-copy`, `supabase/functions/process-maintenance-request`, and `supabase/functions/submit-maintenance-request` to keep sensitive processing server-side. They read:
 
 ```text
 SUPABASE_URL
 SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
 OPENAI_API_KEY
 OPENAI_MODEL
 OPENAI_TRANSCRIPTION_MODEL
@@ -94,6 +95,7 @@ For hosted Supabase:
 ```bash
 supabase secrets set OPENAI_API_KEY="your-real-key" OPENAI_MODEL="gpt-4.1-mini" OPENAI_TRANSCRIPTION_MODEL="gpt-4o-transcribe" --project-ref gholbnyvijfyqdwqgjan
 supabase functions deploy draft-tasks draft-listing-copy process-maintenance-request --project-ref gholbnyvijfyqdwqgjan
+supabase functions deploy submit-maintenance-request --no-verify-jwt --project-ref gholbnyvijfyqdwqgjan
 ```
 
 For GitHub-managed deployment, add these repository secrets in GitHub > Settings > Secrets and variables > Actions:
@@ -119,9 +121,15 @@ Apply `supabase/migrations/20260806160000_maintenance_requests.sql` before deplo
 
 Apply `supabase/migrations/20260806170000_property_admin_maintenance_access.sql` as well. A property-level `admin` can then open the maintenance console and sees only their authorized properties, requests, and units; workspace-wide people/access controls remain unavailable.
 
-For residents, `/maintenance/` is the stable direct request route and can be used as the eventual QR-code destination. Signed-in tenants can also open the public listings and use **Report maintenance**; the popup submits only for their active tenant/unit membership. Google sign-in preserves the direct maintenance route after authentication.
+Authenticated tenant memberships remain available for the signed-in tenant portal, but they are not required for QR intake. Google OAuth remains the only admin authentication mechanism; the QR capability does not create or imply a tenant identity.
 
-Apply `supabase/migrations/20260807090000_maintenance_qr_codes.sql` and `20260807100000_maintenance_qr_function_grants.sql` to enable one permanent QR code per unit. The code contains only an opaque `/m/:token/` URL. A logged-out scan sees no unit information and returns to the same URL after Google sign-in; signed-in residents can submit only when their active `tenant_memberships` row matches that exact unit. Property admins can manage QR cards from **Maintenance requests** for their authorized properties, including SVG viewing, copying, printing, and deliberate regeneration. Set `VITE_PUBLIC_APP_URL` in `.env.local` when printable cards must point to a production URL while developing locally.
+Apply `supabase/migrations/20260807090000_maintenance_qr_codes.sql`, `20260807100000_maintenance_qr_function_grants.sql`, and then `20260813100000_public_maintenance_capabilities.sql`. The last migration retires the legacy plaintext `/m/:token/` values, so existing cards intentionally stop working and each active unit needs a fresh printed card. The new public URL is `/maintenance/q/:long-random-token/`.
+
+An admin generates or rotates a unit code from **Maintenance requests**. The server creates a 256-bit URL-safe capability, persists only its SHA-256 hash, and returns the plaintext once for that browser session so it can be copied or printed. Rotation replaces the stored hash and invalidates the old card immediately; disabling a code invalidates it without retaining a route back to operational data. Generating a replacement always creates a new secret.
+
+The QR page calls only `submit-maintenance-request`, which validates and hashes the supplied capability server-side, resolves the unit/property/workspace there, and uses service-role writes only after that validation. The browser cannot select a unit or write directly to maintenance tables or Storage. The maintenance bucket remains private; photos and audio are MIME-, count-, and size-validated and uploaded by the Edge Function to a server-generated path. QR possession permits one new request for that unit and nothing else: it cannot read units, properties, tenant memberships, maintenance history, notes, AI analyses, tasks, materials, or attachment URLs. The v1 flow intentionally does not expose a request-status capability.
+
+Set `VITE_PUBLIC_APP_URL` in `.env.local` when printable cards must point to a production URL while developing locally. Set `SUPABASE_SERVICE_ROLE_KEY` only in the Edge Function environment (`supabase/.env` for local function serving or Supabase secrets for hosted deployment), never in a `VITE_` value.
 
 ## Deploy
 
