@@ -189,7 +189,7 @@ export function TenantMaintenanceApp({ user, tenantUnits, preview = false, onExi
           </fieldset>
         )}
 
-        {selectedUnit && <TenantRequestComposer title="Report a maintenance problem" propertyId={selectedUnit.property_id} unitId={selectedUnit.unit_id} busy={busy} onSubmit={handleSubmit} submitLabel="Submit request" />}
+        {selectedUnit && <TenantRequestComposer title="Report a maintenance problem" propertyId={selectedUnit.property_id} unitId={selectedUnit.unit_id} busy={busy} onSubmit={handleSubmit} submitLabel="Submit request" hideTitle={preview} hideDescriptionLabel={preview} />}
 
         <section className="tenant-request-area" aria-labelledby="my-requests-title">
           <div className="tenant-request-list">
@@ -207,15 +207,15 @@ export function TenantMaintenanceApp({ user, tenantUnits, preview = false, onExi
               </ul>
             )}
           </div>
-          <TenantCaseFile detail={detail} busy={busy} onAddInformation={handleAddInformation} message={message} />
+          <TenantCaseFile detail={detail} busy={busy} onAddInformation={handleAddInformation} message={message} emptyMessage={requests.length === 0 ? "No requests yet. New requests will appear here after you submit them." : "Select a request to view its status."} />
         </section>
       </main>
-      <AppFooter authenticated onAuthAction={preview ? onExitPreview : onSignOut} />
+      <AppFooter authenticated onAuthAction={preview ? onExitPreview : onSignOut} authActionLabel={preview ? "Return to maintenance workspace" : undefined} />
     </>
   );
 }
 
-function TenantCaseFile({ detail, busy, onAddInformation, message }) {
+function TenantCaseFile({ detail, busy, onAddInformation, message, emptyMessage }) {
   const [urls, setUrls] = useState({});
   useEffect(() => {
     const attachments = detail?.attachments || [];
@@ -226,7 +226,7 @@ function TenantCaseFile({ detail, busy, onAddInformation, message }) {
       .catch(() => {});
   }, [detail, urls]);
 
-  if (!detail) return <section className="tenant-case-file tenant-case-empty"><Wrench size={24} aria-hidden="true" /><p>Select a request to view its status.</p>{message && <p className="message" role="status">{message}</p>}</section>;
+  if (!detail) return <section className="tenant-case-file tenant-case-empty"><Wrench size={24} aria-hidden="true" /><p>{emptyMessage}</p>{message && <p className="message" role="status">{message}</p>}</section>;
   const { request, entries, attachments } = detail;
   return (
     <section className="tenant-case-file" aria-labelledby="tenant-case-title">
@@ -250,7 +250,7 @@ function TenantCaseFile({ detail, busy, onAddInformation, message }) {
   );
 }
 
-export function TenantRequestComposer({ title, propertyId, unitId, busy, onSubmit, submitLabel, compact = false }) {
+export function TenantRequestComposer({ title, propertyId, unitId, busy, onSubmit, submitLabel, compact = false, hideTitle = false, hideDescriptionLabel = false }) {
   const [description, setDescription] = useState("");
   const [photos, setPhotos] = useState([]);
   const { state, recordings, start, stop, removeRecording } = useAudioRecorder({ propertyId, unitId, onMessage: () => {} });
@@ -267,11 +267,11 @@ export function TenantRequestComposer({ title, propertyId, unitId, busy, onSubmi
   }
 
   return (
-    <section className={`tenant-composer ${compact ? "compact" : ""}`} aria-labelledby={`${title.toLowerCase().replaceAll(" ", "-")}-title`}>
-      <h2 id={`${title.toLowerCase().replaceAll(" ", "-")}-title`}>{title}</h2>
+    <section className={`tenant-composer ${compact ? "compact" : ""}`} aria-label={hideTitle ? title : undefined} aria-labelledby={hideTitle ? undefined : `${title.toLowerCase().replaceAll(" ", "-")}-title`}>
+      {!hideTitle && <h2 id={`${title.toLowerCase().replaceAll(" ", "-")}-title`}>{title}</h2>}
       <form onSubmit={handleSubmit}>
         <label htmlFor={`${title}-description`}>
-          <span>{compact ? "What else would you like us to know?" : "Describe what’s happening"}</span>
+          <span className={hideDescriptionLabel ? "visually-hidden" : ""}>{compact ? "What else would you like us to know?" : "Describe what’s happening"}</span>
           <textarea id={`${title}-description`} name="description" value={description} onChange={(event) => setDescription(event.target.value)} rows={compact ? 3 : 5} maxLength="2000" placeholder="For example: the bathroom fan is suddenly very loud." />
         </label>
         <div className="tenant-media-actions">

@@ -13,7 +13,7 @@ import {
 import { getAttachmentKind } from "../lib/media";
 import { MATERIAL_LABELS } from "../lib/seed";
 
-export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
+export function useScopeItems({ workspaceId, propertyId, unitId, onMessage, onItemAdded }) {
   const [items, setItems] = useState([]);
   const [activityLog, setActivityLog] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -55,12 +55,12 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
     );
   }, [propertyId, refresh, unitId]);
 
-  async function addWork(draft) {
+  async function addWork(draft, imageFile = null) {
     const title = draft.title.trim();
     if (!title || !workspaceId || !propertyId) return false;
 
     return runMutation(async () => {
-      await addItem({
+      const item = await addItem({
         workspace_id: workspaceId,
         property_id: propertyId,
         unit_id: unitId || null,
@@ -70,10 +70,28 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
         kind: draft.kind,
         material_type: draft.kind === "material" ? draft.material_type : null,
         status: "approved",
-        sort_order: items.length + 1,
+        sort_order: getNextQueueSortOrder(items, draft),
       });
+      if (imageFile) {
+        try {
+          await uploadAttachment({
+            workspaceId,
+            propertyId,
+            unitId: unitId || null,
+            itemId: item.id,
+            file: imageFile,
+            kind: getAttachmentKind(imageFile, "photo"),
+          });
+        } catch (error) {
+          await deleteItem(item.id);
+          throw error;
+        }
+      }
+      const nextItem = { ...item, attachments: [] };
+      setItems((current) => [...current, nextItem]);
+      onItemAdded?.(nextItem);
       onMessage(`${title} added.`);
-      return true;
+      return nextItem;
     });
   }
 
@@ -261,4 +279,14 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage }) {
 
 function getStatusLabel(status) {
   return status === "pending-review" ? "pending review" : status;
+}
+
+function getNextQueueSortOrder(items, draft) {
+  const matchingItems = items.filter((item) => (
+    !item.archived_at
+    && item.kind === draft.kind
+    && (item.kind !== "material" || item.material_type === draft.material_type)
+  ));
+  const firstSortOrder = Math.min(0, ...matchingItems.map((item) => item.sort_order || 0));
+  return firstSortOrder - 1;
 }

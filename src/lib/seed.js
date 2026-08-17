@@ -8,7 +8,7 @@ export const INITIAL_PROPERTIES = [
   { name: "124/126 N Mantua", units: ["124", "126"] },
   { name: "469 Carthage", units: ["Main Unit"] },
   { name: "458 W Main", units: ["UP", "DOWN"] },
-  { name: "133 S Pearl", units: ["UP", "DOWN"] },
+  { name: "127 S Pearl", units: ["UP", "DOWN"] },
   { name: "310 Park", units: ["Brewery", "AirBnB"] },
 ];
 

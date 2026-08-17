@@ -19,7 +19,7 @@ const PROPERTY_IMAGES = {
   "124/126 N Mantua": imageOneTwentyFourMantua,
   "469 Carthage": imageFourSixtyNineCarthage,
   "458 W Main": imageFourFiftyEightMain,
-  "133 S Pearl": imageOneTwentySevenPearl,
+  "127 S Pearl": imageOneTwentySevenPearl,
   "310 Park": imageThreeTenPark,
 };
 

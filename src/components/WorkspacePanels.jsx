@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, CirclePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
+import { ChevronDown, CirclePlus, ImagePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
 import { STATUS_LABELS } from "../lib/seed";
 
@@ -186,74 +186,151 @@ export function FiltersBar({ query, statusFilter, onQueryChange, onStatusChange 
   );
 }
 
-export function QuickAddPanel({ draft, busy, onDraftChange, onSubmit, isOpen, onClose }) {
+export function QuickAddPanel({
+  variant = "default",
+  draft,
+  busy,
+  onDraftChange,
+  onSubmit,
+  isOpen,
+  onClose,
+  inline = false,
+  panelId = "add-work-panel",
+  presetKind = "",
+  presetMaterialType = "",
+}) {
+  const [imageFile, setImageFile] = useState(null);
+  const [imageInputKey, setImageInputKey] = useState(0);
+  const isMaintenanceQuickAdd = variant === "maintenance";
+  const showKindChoices = !presetKind;
+  const showMaterialChoices = draft.kind === "material" && !presetMaterialType;
+  const itemLabel = draft.kind === "material" ? "Material" : isMaintenanceQuickAdd || inline ? "Task" : "Item";
+  const itemPlaceholder = draft.kind === "material"
+    ? draft.material_type === "collect"
+      ? "What needs to be collected or brought?"
+      : "What needs to be purchased?"
+    : "What needs to be done?";
+
   return (
-    <section className="panel add-panel" id="add-work-panel" aria-labelledby="add-work-title" hidden={!isOpen}>
+    <section className={`panel add-panel${inline ? " column-quick-add" : ""}`} id={panelId} aria-label={inline ? `Add ${itemLabel.toLowerCase()}` : undefined} aria-labelledby={inline || isMaintenanceQuickAdd ? undefined : "add-work-title"} hidden={!isOpen}>
       <div className="add-work-content" id="add-work-content">
-        <div className="add-work-heading">
-          <h2 id="add-work-title">Add tasks or materials</h2>
+        {!inline && !isMaintenanceQuickAdd && <div className="add-work-heading">
+          <div>
+            <h2 id="add-work-title">Add tasks or materials</h2>
+          </div>
           <button className="icon-button add-work-close" type="button" onClick={onClose} aria-label="Close add">
             <X size={17} aria-hidden="true" />
           </button>
-        </div>
+        </div>}
         <form
-          className={draft.kind === "material" ? "add-form has-material-type" : "add-form"}
+          className={`add-form${draft.kind === "material" ? " has-material-type" : ""}${presetKind ? " has-preset-type" : ""}`}
           onSubmit={async (event) => {
-            const added = await onSubmit(event);
-            if (added) onClose?.();
+            const added = await onSubmit(event, imageFile);
+            if (added) {
+              setImageFile(null);
+              setImageInputKey((current) => current + 1);
+              onClose?.();
+            }
           }}
         >
-          <label className="form-field" htmlFor="new-item-kind">
-            <span>Type</span>
-            <select
-              id="new-item-kind"
-              name="kind"
-              value={draft.kind}
-              onChange={(event) => onDraftChange({ kind: event.target.value })}
-            >
-              <option value="task">Task</option>
-              <option value="material">Material</option>
-            </select>
-          </label>
-          {draft.kind === "material" && (
-            <label className="form-field" htmlFor="new-material-list">
-              <span>List</span>
-              <select
-                id="new-material-list"
-                name="materialType"
-                value={draft.material_type}
-                onChange={(event) => onDraftChange({ material_type: event.target.value })}
-              >
-                <option value="shopping">Shopping List</option>
-                <option value="collect">Collect / Bring</option>
-              </select>
-            </label>
+          {showKindChoices && (
+            <fieldset className="form-field add-choice-field">
+              <legend>{isMaintenanceQuickAdd ? "Add a" : "Type"}</legend>
+              <div className="add-choice-options">
+                <label className="add-choice-option" htmlFor="new-item-kind-task">
+                  <input
+                    id="new-item-kind-task"
+                    name="kind"
+                    type="radio"
+                    value="task"
+                    checked={draft.kind === "task"}
+                    onChange={(event) => onDraftChange({ kind: event.target.value })}
+                  />
+                  <span>Task</span>
+                </label>
+                <label className="add-choice-option" htmlFor="new-item-kind-material">
+                  <input
+                    id="new-item-kind-material"
+                    name="kind"
+                    type="radio"
+                    value="material"
+                    checked={draft.kind === "material"}
+                    onChange={(event) => onDraftChange({ kind: event.target.value })}
+                  />
+                  <span>Material</span>
+                </label>
+              </div>
+            </fieldset>
+          )}
+          {showMaterialChoices && (
+            <fieldset className="form-field add-choice-field">
+              <legend>List</legend>
+              <div className="add-choice-options">
+                <label className="add-choice-option" htmlFor="new-material-list-shopping">
+                  <input
+                    id="new-material-list-shopping"
+                    name="materialType"
+                    type="radio"
+                    value="shopping"
+                    checked={draft.material_type === "shopping"}
+                    onChange={(event) => onDraftChange({ material_type: event.target.value })}
+                  />
+                  <span>Shopping List</span>
+                </label>
+                <label className="add-choice-option" htmlFor="new-material-list-collect">
+                  <input
+                    id="new-material-list-collect"
+                    name="materialType"
+                    type="radio"
+                    value="collect"
+                    checked={draft.material_type === "collect"}
+                    onChange={(event) => onDraftChange({ material_type: event.target.value })}
+                  />
+                  <span>Collect / Bring</span>
+                </label>
+              </div>
+            </fieldset>
           )}
           <label className="form-field" htmlFor="new-item-title">
-            <span>Item</span>
+            <span>{itemLabel}</span>
             <input
               id="new-item-title"
               name="title"
               value={draft.title}
               onChange={(event) => onDraftChange({ title: event.target.value })}
-              placeholder="What needs to be done?"
+              placeholder={itemPlaceholder}
               enterKeyHint="done"
               maxLength="140"
               required
+              autoFocus={inline}
             />
           </label>
           <label className="form-field" htmlFor="new-item-note">
-            <span>Note <span className="optional-label">optional</span></span>
+            <span>{isMaintenanceQuickAdd ? "Details" : "Note"} <span className="optional-label">optional</span></span>
             <input
               id="new-item-note"
               name="note"
               value={draft.note}
               onChange={(event) => onDraftChange({ note: event.target.value })}
-              placeholder="Add useful details"
+              placeholder={isMaintenanceQuickAdd ? "Add location, size, color, model, quantity, or other useful details." : "Add useful details"}
               maxLength="500"
             />
           </label>
-          <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> Add</button>
+          <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor="new-item-image" title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
+            <ImagePlus size={18} aria-hidden="true" />
+            <span>Add Image</span>
+            <input
+              key={imageInputKey}
+              id="new-item-image"
+              name="image"
+              type="file"
+              accept="image/*"
+              onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+            />
+          </label>
+          <div className="add-form-actions">
+            <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> {isMaintenanceQuickAdd ? `Add ${draft.kind}` : "Add"}</button>
+          </div>
         </form>
       </div>
     </section>

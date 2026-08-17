@@ -68,7 +68,7 @@ export function PublicSite({ listings, busy, error, onSignIn, authenticated = fa
           <PublicListingDirectory listings={listings} busy={busy} />
         )}
       </main>
-      <AppFooter authenticated={authenticated} onAuthAction={tenantPreview ? onExitPreview : authenticated ? onSignOut : onSignIn} authActionLabel={tenantPreview ? "Exit preview" : undefined} />
+      <AppFooter authenticated={authenticated} onAuthAction={tenantPreview ? onExitPreview : authenticated ? onSignOut : onSignIn} authActionLabel={tenantPreview ? "Return to maintenance workspace" : undefined} />
       {canReportMaintenance && <TenantMaintenanceDialog open={maintenanceDialogOpen} onClose={() => setMaintenanceDialogOpen(false)} user={user} tenantUnits={tenantUnits} preview={tenantPreview} />}
     </>
   );

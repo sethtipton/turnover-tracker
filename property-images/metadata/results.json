@@ -91,12 +91,12 @@
     "id": "469-carthage-ave",
     "address": "469 Carthage Ave, Kent, OH 44240",
     "status": "needs-review",
-    "streetViewAvailable": true,
-    "rawDimensions": { "width": 1280, "height": 720 },
-    "crop": { "left": 360, "top": 60, "width": 880, "height": 660 },
+    "streetViewAvailable": false,
+    "rawDimensions": { "width": 1024, "height": 768 },
+    "crop": { "left": 0, "top": 0, "width": 1024, "height": 768 },
     "finalDimensions": { "width": 1024, "height": 768 },
     "outputPath": "../processed/469-carthage-ave.webp",
-    "notes": "Exact Maps result confirmed, but the May 2019 panorama is labeled 468 Carthage Ave across the street. The crop centers the house and driveway aimed at by the 469 marker; property confirmation is recommended."
+    "notes": "User-supplied replacement photo; the full 4:3 frame was retained and exported as WebP."
   },
   {
     "id": "458-w-main-st",

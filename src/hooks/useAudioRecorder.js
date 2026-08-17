@@ -7,7 +7,7 @@ const AUDIO_MIME_TYPES = [
   "audio/aac",
 ];
 
-export function useAudioRecorder({ propertyId, unitId, onMessage }) {
+export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propertyId), onMessage }) {
   const [state, setState] = useState("idle");
   const [level, setLevel] = useState(0);
   const [recordings, setRecordings] = useState([]);
@@ -28,7 +28,7 @@ export function useAudioRecorder({ propertyId, unitId, onMessage }) {
   }, []);
 
   async function start() {
-    if (!propertyId) {
+    if (!enabled) {
       onMessage("Select a property before recording.");
       return;
     }
