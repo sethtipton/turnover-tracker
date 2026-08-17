@@ -1603,7 +1603,7 @@
     font-weight: var(--font-weight-extrabold);
     text-decoration: none;
 
-    & span { flex: 1; }
+    & span { flex: 1; font-size: var(--font-size-md);font-weight: var(--font-weight-bold)}
     &:hover { background: var(--color-surface); }
   }
 
@@ -1642,6 +1642,7 @@
   .portfolio-item-title {
     min-width: 0;
     overflow-wrap: anywhere;
+    font-weight: var(--font-weight-medium);
   }
 
   .portfolio-item-actions {
@@ -2195,12 +2196,41 @@
   .item-column {
     --item-column-count-color: var(--color-text-muted);
 
-    & .panel-title > span { color: var(--item-column-count-color); }
+    & .panel-title:has(.item-column-add-button) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-3);
+    }
+
+    & .item-column-count {
+      flex: 0 0 auto;
+      color: var(--item-column-count-color);
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-extrabold);
+      line-height: 1;
+    }
   }
 
   .item-column-task { --item-column-count-color: var(--color-task); }
   .item-column-shopping { --item-column-count-color: var(--color-shopping); }
   .item-column-collect { --item-column-count-color: var(--color-collect); }
+
+  .item-column-add-button {
+    display: inline-grid;
+    width: 2.5rem;
+    min-height: 2.5rem;
+    place-items: center;
+    padding: 0;
+    border-color: color-mix(in oklab, var(--item-column-count-color) 55%, var(--color-control-border));
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--item-column-count-color) 8%, var(--color-surface-raised));
+    color: var(--item-column-count-color);
+
+    &:is(:hover, :focus-visible) {
+      border-color: var(--item-column-count-color);
+      background: color-mix(in oklab, var(--item-column-count-color) 16%, var(--color-surface-raised));
+      color: var(--item-column-count-color);
+    }
+  }
 
   .panel-toggle {
     width: 100%;
@@ -2260,11 +2290,100 @@
 
   .add-form {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: end;
 
-    & > .form-field { flex: 1 1 0; min-inline-size: 0; }
+    & > .form-field { flex: 1 1 10rem; min-inline-size: 0; }
+    & > .add-choice-field { flex: 0 1 auto; }
     & > :is(.add-image-button, button[type="submit"]) { flex: 0 0 auto; }
+
+    & > .add-form-actions {
+      display: flex;
+      flex: 1 0 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  .add-form .add-image-button {
+    display: inline-flex;
+    width: auto;
+    gap: var(--space-2);
+    padding-inline: var(--space-4);
+  }
+
+  .add-form-actions > button { flex: 0 0 auto; }
+
+  .add-choice-field {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    & > legend {
+      margin-block-end: 0.3125rem;
+      padding: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  .add-choice-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    flex-direction: column;
+  }
+
+  .add-choice-option {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface-raised);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.2;
+    white-space: nowrap;
+
+    &:hover { border-color: var(--color-primary); color: var(--color-text); }
+
+    &:has(input:checked) {
+      border-color: var(--color-primary);
+      background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-raised));
+      color: var(--color-text);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    & input[type="radio"] {
+      flex: 0 0 auto;
+      width: 1.125rem;
+      height: 1.125rem;
+      margin: 0;
+      accent-color: var(--color-primary);
+    }
+  }
+
+  @supports not (accent-color: var(--color-primary)) {
+    .add-choice-option input[type="radio"] {
+      appearance: none;
+      border: 2px solid var(--color-control-border);
+      border-radius: 50%;
+      background: var(--color-surface-raised);
+    }
+
+    .add-choice-option input[type="radio"]:checked {
+      border: 0.34375rem solid var(--color-primary);
+    }
   }
 
   .add-image-button {
@@ -2282,6 +2401,34 @@
     &:hover,
     &.is-selected { color: var(--color-primary); background: var(--color-surface); }
     &:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+  }
+
+  .column-quick-add {
+    margin-block: 0 var(--space-5);
+    border-style: dashed;
+    border-color: color-mix(in oklab, var(--item-column-count-color) 38%, var(--color-border));
+    background: color-mix(in oklab, var(--item-column-count-color) 4%, var(--color-surface-raised));
+    opacity: 1;
+    translate: 0;
+    transition:
+      display 180ms,
+      opacity 180ms ease-out,
+      translate 180ms ease-out;
+    transition-behavior: allow-discrete;
+
+    & .add-work-content { padding: var(--space-5); }
+    & .add-form { gap: var(--space-5); }
+  }
+
+  .item-column > .column-quick-add + div:not([hidden]) {
+    margin-block-start: var(--space-5);
+  }
+
+  @starting-style {
+    .column-quick-add {
+      opacity: 0;
+      translate: 0 calc(var(--space-3) * -1);
+    }
   }
 
   @media (pointer: coarse) {
@@ -2423,6 +2570,7 @@
     width: 100%;
     min-width: 0;
     margin: 0;
+    padding: var(--space-1) 0;
   }
 
   .materials-row {
@@ -2440,6 +2588,7 @@
     &.is-reorderable { cursor: grab; }
     &.is-dragging { opacity: 0.5; }
     &.is-drag-over { outline: 1px solid var(--color-primary-hover); outline-offset: -1px; }
+    &.is-entering { animation: item-queue-enter 440ms cubic-bezier(0.2, 0, 0, 1) both; }
 
     &.material-shopping { --status-color: var(--color-shopping); }
     &.material-collect { --status-color: var(--color-collect); }
@@ -2598,6 +2747,14 @@
     &:disabled { cursor: not-allowed; opacity: 0.35; }
   }
 
+  .item-drag-handle {
+    color: var(--color-text-muted);
+    cursor: grab;
+    touch-action: none;
+
+    &:active { cursor: grabbing; }
+  }
+
   .item-actions {
     align-items: center;
     justify-content: flex-end;
@@ -2739,6 +2896,23 @@
   ::view-transition-group(*) {
     animation-duration: 280ms;
     animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  @keyframes item-queue-enter {
+    from {
+      opacity: 0;
+      scale: 0.985;
+      translate: 0 calc(var(--space-5) * -1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .column-quick-add,
+    .item-card.is-entering {
+      animation: none;
+      translate: none;
+      transition-duration: 0.1s;
+    }
   }
 }
 
@@ -2956,7 +3130,8 @@
 
       & > .form-field { grid-column: 1 / -1; }
       & > .add-image-button { grid-column: 1; justify-self: start; }
-      & > button[type="submit"] { grid-column: 2; width: auto; }
+      & > .add-form-actions { grid-column: 1 / -1; justify-content: end; }
+      & > .add-form-actions > button { width: auto; }
     }
 
     .review-queue-header > button {
@@ -3416,11 +3591,70 @@
     min-inline-size: 0;
   }
 
+  .admin-quick-add #maintenance-quick-add .add-form > .add-choice-field { flex: 0 1 auto; }
+
   .admin-quick-add #maintenance-quick-add .add-form > :is(.add-image-button, button[type="submit"]) {
     flex: 0 0 auto;
   }
 
   .admin-quick-add #maintenance-quick-add .add-form > .add-image-button { align-self: end; }
+}
+
+@media (min-width: 761px) {
+  .add-form.has-material-type,
+  .admin-quick-add #maintenance-quick-add .add-form.has-material-type {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: end;
+  }
+
+  .add-form.has-material-type > .add-choice-field {
+    grid-column: 1 / -1;
+  }
+
+  .add-form.has-material-type > label[for="new-item-title"] {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .add-form.has-material-type > label[for="new-item-note"] {
+    grid-column: 1;
+    grid-row: 4;
+  }
+
+  .add-form.has-material-type > .add-image-button {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+    align-self: end;
+  }
+
+  .add-form.has-material-type > .add-form-actions {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+
+  .add-form.has-material-type.has-preset-type {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .add-form.has-material-type.has-preset-type > label[for="new-item-title"] {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .add-form.has-material-type.has-preset-type > label[for="new-item-note"] {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .add-form.has-material-type.has-preset-type > .add-image-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .add-form.has-material-type.has-preset-type > .add-form-actions {
+    grid-row: 3;
+  }
 }
 
 .admin-intake h3,

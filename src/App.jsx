@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ClipboardList, Hammer, Mic, ShoppingCart } from "lucide-react";
 import "./App.css";
 import { ActivityLog } from "./components/ActivityLog";
 import { AppFooter } from "./components/AppFooter";
@@ -64,6 +63,12 @@ const emptyDraft = {
   material_type: "shopping",
 };
 
+const QUICK_ADD_TARGETS = {
+  tasks: { kind: "task", material_type: "shopping" },
+  shopping: { kind: "material", material_type: "shopping" },
+  collect: { kind: "material", material_type: "collect" },
+};
+
 function App() {
   const [session, setSession] = useState(undefined);
   const [workspace, setWorkspace] = useState(null);
@@ -75,8 +80,11 @@ function App() {
   const [draft, setDraft] = useState(emptyDraft);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const openRequests = { tasks: 0, shopping: 0, collect: 0, review: 0 };
-  const [addWorkOpen, setAddWorkOpen] = useState(false);
+  const [summaryAddOpen, setSummaryAddOpen] = useState(false);
+  const [addWorkTarget, setAddWorkTarget] = useState("");
+  const [columnOpenRequests, setColumnOpenRequests] = useState({ tasks: 0, shopping: 0, collect: 0 });
+  const [enteringItemIds, setEnteringItemIds] = useState(() => new Set());
+  const enteringItemTimersRef = useRef(new Map());
   const [message, setMessage] = useState("");
   const [accessError, setAccessError] = useState("");
   const [mediaUrls, setMediaUrls] = useState({});
@@ -99,6 +107,11 @@ function App() {
   const [tenantUserId, setTenantUserId] = useState("");
   const [maintenanceOpen, setMaintenanceOpen] = useState(() => isMaintenanceRoute());
   const [maintenancePreview, setMaintenancePreview] = useState(() => getMaintenancePreviewFromCurrentPath());
+  const openRequests = { ...columnOpenRequests, review: 0 };
+
+  useEffect(() => () => {
+    enteringItemTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   const {
     state: dictationState,
@@ -133,6 +146,7 @@ function App() {
     propertyId: selectedPropertyId,
     unitId: selectedUnitId,
     onMessage: setMessage,
+    onItemAdded: handleItemAdded,
   });
 
   const {
@@ -430,8 +444,48 @@ function App() {
     handleOpenScope(propertyId, "");
   }
 
+  function openColumnQuickAdd(target) {
+    setQuery("");
+    setStatusFilter("all");
+    setDraft({ ...emptyDraft, ...QUICK_ADD_TARGETS[target] });
+    setSummaryAddOpen(false);
+    setAddWorkTarget(target);
+  }
+
   function handleToggleAddWork(nextOpen) {
-    setAddWorkOpen((current) => typeof nextOpen === "boolean" ? nextOpen : !current);
+    const willOpen = typeof nextOpen === "boolean" ? nextOpen : !summaryAddOpen;
+    if (willOpen) setAddWorkTarget("");
+    setSummaryAddOpen(willOpen);
+  }
+
+  function handleColumnQuickAdd(target) {
+    if (addWorkTarget === target) {
+      setAddWorkTarget("");
+      return;
+    }
+    openColumnQuickAdd(target);
+  }
+
+  function handleItemAdded(item) {
+    const target = item.kind === "material"
+      ? item.material_type === "collect" ? "collect" : "shopping"
+      : "tasks";
+    const existingTimer = enteringItemTimersRef.current.get(item.id);
+    if (existingTimer) window.clearTimeout(existingTimer);
+
+    setColumnOpenRequests((current) => ({ ...current, [target]: current[target] + 1 }));
+    setSummaryAddOpen(false);
+    setAddWorkTarget("");
+    setDraft(emptyDraft);
+    setEnteringItemIds((current) => new Set(current).add(item.id));
+    enteringItemTimersRef.current.set(item.id, window.setTimeout(() => {
+      setEnteringItemIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+      enteringItemTimersRef.current.delete(item.id);
+    }, 560));
   }
 
   function handleUnitChange(unitId) {
@@ -584,9 +638,7 @@ function App() {
 
   async function handleAddItem(event, imageFile = null) {
     event.preventDefault();
-    const added = await addWork(draft, imageFile);
-    if (added) setDraft(emptyDraft);
-    return added;
+    return addWork(draft, imageFile);
   }
 
   function handleMaintenancePreview(preview) {
@@ -686,6 +738,25 @@ function App() {
     }
   }
 
+  function renderColumnQuickAdd(target, panelId) {
+    if (addWorkTarget !== target) return null;
+    const preset = QUICK_ADD_TARGETS[target];
+    return (
+      <QuickAddPanel
+        inline
+        panelId={panelId}
+        presetKind={preset.kind}
+        presetMaterialType={preset.kind === "material" ? preset.material_type : ""}
+        draft={draft}
+        busy={busy}
+        onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+        onSubmit={handleAddItem}
+        isOpen
+        onClose={() => setAddWorkTarget("")}
+      />
+    );
+  }
+
   function renderWorkGrid(compact) {
     return (
       <div className="work-grid">
@@ -700,16 +771,16 @@ function App() {
           mediaUrls={mediaUrls}
           openRequest={openRequests.review}
         />}
-        <ItemColumn title="Tasks" tone="task" icon={<ClipboardList size={18} aria-hidden="true" />} items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} />
+        <ItemColumn title="Tasks" tone="task" items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} quickAddOpen={addWorkTarget === "tasks"} onQuickAdd={!compact ? () => handleColumnQuickAdd("tasks") : undefined} quickAddPanel={!compact ? renderColumnQuickAdd("tasks", "tasks-items-quick-add") : null} quickAddPanelId="tasks-items-quick-add" enteringItemIds={enteringItemIds} />
         {!compact && (
           <div className="materials-row">
-            <ItemColumn title="Shopping List" tone="shopping" icon={<ShoppingCart size={18} aria-hidden="true" />} items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} />
-            <ItemColumn title="Collect / Bring" tone="collect" icon={<Hammer size={18} aria-hidden="true" />} items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.collect} />
+            <ItemColumn title="Shopping List" tone="shopping" items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} quickAddOpen={addWorkTarget === "shopping"} onQuickAdd={() => handleColumnQuickAdd("shopping")} quickAddPanel={renderColumnQuickAdd("shopping", "shopping-list-items-quick-add")} enteringItemIds={enteringItemIds} />
+            <ItemColumn title="Collect / Bring" tone="collect" items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.collect} quickAddOpen={addWorkTarget === "collect"} onQuickAdd={() => handleColumnQuickAdd("collect")} quickAddPanel={renderColumnQuickAdd("collect", "collect-bring-items-quick-add")} enteringItemIds={enteringItemIds} />
           </div>
         )}
         {!compact && (
           <>
-            <ItemColumn title="Recordings" icon={<Mic size={18} aria-hidden="true" />} items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
+            <ItemColumn title="Recordings" items={recordingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} />
             <ActivityLog entries={activityLog} archivedItems={archivedItems} busy={busy} onUnarchive={unarchiveItem} />
           </>
         )}
@@ -874,15 +945,15 @@ function App() {
                   onQueryChange={setQuery}
                   onStatusChange={setStatusFilter}
                   onAddWork={handleToggleAddWork}
-                  addWorkOpen={addWorkOpen}
+                  addWorkOpen={summaryAddOpen}
                 />
                 <QuickAddPanel
                   draft={draft}
                   busy={busy}
                   onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                   onSubmit={handleAddItem}
-                  isOpen={addWorkOpen}
-                  onClose={() => setAddWorkOpen(false)}
+                  isOpen={summaryAddOpen}
+                  onClose={() => setSummaryAddOpen(false)}
                 />
                 <DictationInbox
                   recordings={selectedScopeRecordings}

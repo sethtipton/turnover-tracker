@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, Paperclip, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 import { STATUS_LABELS } from "../lib/seed";
 
 export function ItemColumn({
@@ -20,32 +20,38 @@ export function ItemColumn({
   reorderable = false,
   onReorder,
   tone = "",
+  quickAddOpen = false,
+  onQuickAdd,
+  quickAddPanel,
+  quickAddPanelId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-items-quick-add`,
+  enteringItemIds = new Set(),
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [draggingId, setDraggingId] = useState("");
   const [dragOverId, setDragOverId] = useState("");
+  const pointerDragRef = useRef(null);
   const panelId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-items`;
   const isOpen = forceOpen || !isCollapsed;
   const orderedItems = sortItemsForDisplay(items);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openRequest > 0) setIsCollapsed(false);
   }, [openRequest]);
 
   function handleStatusChange(item, status) {
-    runCompletionTransition(() => onStatus(item, status), status === "done");
+    runItemTransition(() => onStatus(item, status), status === "done");
   }
 
   function handleItemChange(item, patch) {
     const isNewlyDone = item.status !== "done" && patch.status === "done";
-    runCompletionTransition(() => onItemChange(item, patch), isNewlyDone);
+    runItemTransition(() => onItemChange(item, patch), isNewlyDone);
   }
 
   const reorderableItems = orderedItems.filter((item) => item.status !== "done");
 
   function applyOrder(nextItems) {
     if (nextItems.every((item, index) => item.id === reorderableItems[index]?.id)) return;
-    onReorder?.(nextItems.map((item) => item.id));
+    runItemTransition(() => onReorder?.(nextItems.map((item) => item.id)));
   }
 
   function moveItem(itemId, direction) {
@@ -74,6 +80,55 @@ export function ItemColumn({
     applyOrder(nextItems);
   }
 
+  function getPointerDropTarget(event) {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-reorder-item-id]");
+    const targetId = target?.dataset.reorderItemId || "";
+    return reorderableItems.some((item) => item.id === targetId) ? targetId : "";
+  }
+
+  function startPointerDrag(event, itemId) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    pointerDragRef.current = { itemId, pointerId: event.pointerId, targetId: "" };
+    setDraggingId(itemId);
+    setDragOverId("");
+  }
+
+  function movePointerDrag(event) {
+    const pointerDrag = pointerDragRef.current;
+    if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
+    const targetId = getPointerDropTarget(event);
+    pointerDrag.targetId = targetId;
+    setDragOverId(targetId && targetId !== pointerDrag.itemId ? targetId : "");
+  }
+
+  function endPointerDrag(event) {
+    const pointerDrag = pointerDragRef.current;
+    if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
+    const targetId = getPointerDropTarget(event) || pointerDrag.targetId;
+    pointerDragRef.current = null;
+    setDraggingId("");
+    setDragOverId("");
+    if (!targetId || targetId === pointerDrag.itemId) return;
+
+    const sourceIndex = reorderableItems.findIndex((item) => item.id === pointerDrag.itemId);
+    const targetIndex = reorderableItems.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const nextItems = [...reorderableItems];
+    const [movedItem] = nextItems.splice(sourceIndex, 1);
+    nextItems.splice(targetIndex, 0, movedItem);
+    applyOrder(nextItems);
+  }
+
+  function cancelPointerDrag(event) {
+    if (pointerDragRef.current?.pointerId !== event.pointerId) return;
+    pointerDragRef.current = null;
+    setDraggingId("");
+    setDragOverId("");
+  }
+
   return (
     <section className={`panel item-column ${tone ? `item-column-${tone}` : ""} ${isOpen ? "" : "is-collapsed"} ${compact ? "compact" : ""}`} aria-labelledby={`${panelId}-title`}>
       <div className="panel-title">
@@ -89,11 +144,25 @@ export function ItemColumn({
           >
             <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
             {icon}
+            <span className="item-column-count" aria-label={`${items.length} ${title.toLowerCase()} items`}>{items.length}</span>
             <span>{title}</span>
           </button>
         </h2>
-        <span aria-label={`${items.length} ${title.toLowerCase()} items`}>{items.length}</span>
+        {onQuickAdd && (
+          <button
+            className="item-column-add-button"
+            type="button"
+            onClick={onQuickAdd}
+            aria-expanded={quickAddOpen}
+            aria-controls={quickAddPanelId}
+            aria-label={`Add ${title.toLowerCase()} item`}
+            title={`Add ${title.toLowerCase()} item`}
+          >
+            <Plus size={18} aria-hidden="true" />
+          </button>
+        )}
       </div>
+      {quickAddPanel}
       <div id={panelId} hidden={!isOpen}>
         {items.length === 0 ? (
           <p className="empty">Nothing here yet.</p>
@@ -113,6 +182,7 @@ export function ItemColumn({
               canReorder={reorderable && item.status !== "done"}
               isDragging={draggingId === item.id}
               isDragOver={dragOverId === item.id && draggingId !== item.id}
+              isEntering={enteringItemIds.has(item.id)}
               canMoveUp={reorderableItems[0]?.id !== item.id}
               canMoveDown={reorderableItems.at(-1)?.id !== item.id}
               onMoveUp={() => moveItem(item.id, -1)}
@@ -133,6 +203,10 @@ export function ItemColumn({
                 setDraggingId("");
                 setDragOverId("");
               }}
+              onPointerDragStart={(event) => startPointerDrag(event, item.id)}
+              onPointerDragMove={movePointerDrag}
+              onPointerDragEnd={endPointerDrag}
+              onPointerDragCancel={cancelPointerDrag}
             />)}
           </ul>
         )}
@@ -154,6 +228,7 @@ function ItemCard({
   canReorder,
   isDragging,
   isDragOver,
+  isEntering,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -163,6 +238,10 @@ function ItemCard({
   onDragLeave,
   onDrop,
   onDragEnd,
+  onPointerDragStart,
+  onPointerDragMove,
+  onPointerDragEnd,
+  onPointerDragCancel,
 }) {
   const [editRequest, setEditRequest] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
@@ -170,8 +249,9 @@ function ItemCard({
 
   return (
     <li
-      className={`item-card ${itemTypeClass} status-${item.status}${canReorder ? " is-reorderable" : ""}${isDragging ? " is-dragging" : ""}${isDragOver ? " is-drag-over" : ""}`}
+      className={`item-card ${itemTypeClass} status-${item.status}${canReorder ? " is-reorderable" : ""}${isDragging ? " is-dragging" : ""}${isDragOver ? " is-drag-over" : ""}${isEntering ? " is-entering" : ""}`}
       style={{ viewTransitionName: `item-${item.id}` }}
+      data-reorder-item-id={canReorder ? item.id : undefined}
       draggable={canReorder}
       onDragStart={canReorder ? onDragStart : undefined}
       onDragOver={canReorder ? onDragOver : undefined}
@@ -202,6 +282,10 @@ function ItemCard({
           canMoveDown={canMoveDown}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
+          onPointerDragStart={onPointerDragStart}
+          onPointerDragMove={onPointerDragMove}
+          onPointerDragEnd={onPointerDragEnd}
+          onPointerDragCancel={onPointerDragCancel}
         />
       )}
       {!compact && <AttachmentList attachments={item.attachments} mediaUrls={mediaUrls} onDelete={onDeleteAttachment} />}
@@ -209,13 +293,25 @@ function ItemCard({
   );
 }
 
-function ItemActions({ item, isEditing, onEdit, onStatus, onDelete, onArchive, canReorder, canMoveUp, canMoveDown, onMoveUp, onMoveDown }) {
+function ItemActions({ item, isEditing, onEdit, onStatus, onDelete, onArchive, canReorder, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onPointerDragStart, onPointerDragMove, onPointerDragEnd, onPointerDragCancel }) {
   const statusId = `item-status-${item.id}`;
 
   return (
     <div className="item-actions">
       {canReorder && (
         <>
+          <button
+            className="icon-button item-drag-handle"
+            type="button"
+            onPointerDown={onPointerDragStart}
+            onPointerMove={onPointerDragMove}
+            onPointerUp={onPointerDragEnd}
+            onPointerCancel={onPointerDragCancel}
+            aria-label={`Drag ${item.title} to reorder`}
+            title="Drag to reorder"
+          >
+            <GripVertical size={17} aria-hidden="true" />
+          </button>
           <button className="icon-button item-move-button" type="button" onClick={onMoveUp} disabled={!canMoveUp} aria-label={`Move ${item.title} up`}>
             <ArrowUp size={16} aria-hidden="true" />
           </button>
@@ -443,7 +539,7 @@ function sortItemsForDisplay(items) {
   });
 }
 
-function runCompletionTransition(update, shouldAnimate) {
+function runItemTransition(update, shouldAnimate = true) {
   const canAnimate = shouldAnimate
     && document.startViewTransition
     && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
