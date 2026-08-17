@@ -2215,11 +2215,17 @@
   .item-column-collect { --item-column-count-color: var(--color-collect); }
 
   .item-column-add-button {
+    --item-column-add-size: 2.5rem;
+
     display: inline-grid;
-    width: 2.5rem;
-    min-height: 2.5rem;
+    flex: 0 0 var(--item-column-add-size);
+    inline-size: var(--item-column-add-size);
+    block-size: var(--item-column-add-size);
+    min-inline-size: var(--item-column-add-size);
+    min-block-size: var(--item-column-add-size);
     place-items: center;
     padding: 0;
+    aspect-ratio: 1;
     border-color: color-mix(in oklab, var(--item-column-count-color) 55%, var(--color-control-border));
     border-radius: 50%;
     background: color-mix(in oklab, var(--item-column-count-color) 8%, var(--color-surface-raised));
@@ -2432,6 +2438,8 @@
   }
 
   @media (pointer: coarse) {
+    .item-column-add-button { --item-column-add-size: 3rem; }
+
     .add-image-button {
       width: 3rem;
       min-height: 3rem;
