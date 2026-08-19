@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { STATUS_LABELS } from "../lib/seed";
 
 export function ItemColumn({
   title,
   icon,
   items,
+  itemCount = items.length,
+  itemCountLabel = `${itemCount} ${title.toLowerCase()} items`,
   onItemChange,
   onStatus,
   onDelete,
@@ -144,7 +146,7 @@ export function ItemColumn({
           >
             <ChevronDown className="panel-toggle-icon" size={17} aria-hidden="true" />
             {icon}
-            <span className="item-column-count" aria-label={`${items.length} ${title.toLowerCase()} items`}>{items.length}</span>
+            <span className="item-column-count" aria-label={itemCountLabel}>{itemCount}</span>
             <span>{title}</span>
           </button>
         </h2>
@@ -411,6 +413,7 @@ export function EditableItem({ item, editRequest = 0, onEditingChange, onSave, o
           <div className="item-title-content">
             <h3>{item.title}</h3>
             {item.note && <p>{item.note}</p>}
+            {(item.attachments?.length || 0) > 0 && <span className="item-attachment-count"><Paperclip size={14} aria-hidden="true" /> {item.attachments.length} attachment{item.attachments.length === 1 ? "" : "s"}</span>}
           </div>
           {showInlineEdit && (
             <button className="icon-button edit-title-button" type="button" onClick={beginEdit} aria-label={`Edit ${item.title}`}>
@@ -494,28 +497,48 @@ export function EditableItem({ item, editRequest = 0, onEditingChange, onSave, o
   );
 }
 
-export function AttachmentList({ attachments = [], mediaUrls, onDelete }) {
+export function AttachmentList({ attachments = [], mediaUrls = {}, onDelete }) {
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   if (attachments.length === 0) return null;
 
   return (
-    <ul className="attachments" role="list" aria-label="Attachments">
-      {attachments.map((attachment) => (
-        <li className="attachment" key={attachment.id}>
-          <AttachmentPreview attachment={attachment} url={mediaUrls[attachment.storage_path]} />
-          <button type="button" onClick={() => onDelete(attachment)} aria-label={`Remove attachment ${attachment.file_name}`}>Remove</button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="attachments" role="list" aria-label="Attachments">
+        {attachments.map((attachment) => (
+          <li className="attachment" key={attachment.id}>
+            <AttachmentPreview attachment={attachment} url={mediaUrls[attachment.storage_path]} onOpenPhoto={() => setSelectedPhoto(attachment)} />
+            {onDelete && <button type="button" onClick={() => onDelete(attachment)} aria-label={`Remove attachment ${attachment.file_name}`}>Remove</button>}
+          </li>
+        ))}
+      </ul>
+      <PhotoPreviewDialog attachment={selectedPhoto} url={selectedPhoto ? mediaUrls[selectedPhoto.storage_path] : ""} onClose={() => setSelectedPhoto(null)} />
+    </>
   );
 }
 
-function AttachmentPreview({ attachment, url }) {
+function AttachmentPreview({ attachment, url, onOpenPhoto }) {
   const isImage = attachment.mime_type?.startsWith("image/");
   const isAudio = attachment.mime_type?.startsWith("audio/");
 
-  if (isImage && url) return <img src={url} alt={`Task attachment: ${attachment.file_name}`} loading="lazy" />;
+  if (isImage && url) return <button className="attachment-image-button" type="button" onClick={onOpenPhoto} aria-label={`View photo ${attachment.file_name}`}><img src={url} alt="" loading="lazy" /></button>;
   if (isAudio && url) return <audio src={url} controls aria-label={`Audio attachment: ${attachment.file_name}`} />;
   return <span>{attachment.file_name}</span>;
+}
+
+function PhotoPreviewDialog({ attachment, url, onClose }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+    if (attachment && !dialog.open) dialog.showModal();
+    if (!attachment && dialog.open) dialog.close();
+    const handleClose = () => onClose();
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
+  }, [attachment, onClose]);
+
+  return <dialog ref={dialogRef} className="attachment-preview-dialog" closedby="any" aria-label={attachment ? `Photo preview: ${attachment.file_name}` : "Photo preview"}><button className="dialog-close" type="button" onClick={() => dialogRef.current?.close()} aria-label="Close photo preview"><X size={20} aria-hidden="true" /></button>{attachment && url && <img src={url} alt={attachment.file_name} />}</dialog>;
 }
 
 function getItemEditDraft(item) {

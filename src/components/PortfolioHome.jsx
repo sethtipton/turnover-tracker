@@ -26,6 +26,7 @@ export function PortfolioHome({
   onOpenScope,
   onItemChange,
   onDeleteItem,
+  mediaUrls,
 }) {
   const [activePanel, setActivePanel] = useState("");
   const [renderedPanel, setRenderedPanel] = useState("tasks");
@@ -68,6 +69,7 @@ export function PortfolioHome({
             onOpenScope={onOpenScope}
             onItemChange={onItemChange}
             onDeleteItem={onDeleteItem}
+            mediaUrls={mediaUrls}
           />
         </div>
       </div>

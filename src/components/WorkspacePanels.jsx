@@ -192,6 +192,7 @@ export function QuickAddPanel({
   busy,
   onDraftChange,
   onSubmit,
+  onRetryAttachment,
   isOpen,
   onClose,
   inline = false,
@@ -201,6 +202,9 @@ export function QuickAddPanel({
 }) {
   const [imageFile, setImageFile] = useState(null);
   const [imageInputKey, setImageInputKey] = useState(0);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [attachmentFailure, setAttachmentFailure] = useState(null);
+  const [retryingAttachment, setRetryingAttachment] = useState(false);
   const isMaintenanceQuickAdd = variant === "maintenance";
   const showKindChoices = !presetKind;
   const showMaterialChoices = draft.kind === "material" && !presetMaterialType;
@@ -210,6 +214,33 @@ export function QuickAddPanel({
       ? "What needs to be collected or brought?"
       : "What needs to be purchased?"
     : "What needs to be done?";
+
+  useEffect(() => {
+    if (!imageFile?.type?.startsWith("image/")) {
+      setImagePreviewUrl("");
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
+  function clearImage() {
+    setImageFile(null);
+    setImageInputKey((current) => current + 1);
+  }
+
+  async function retryAttachment() {
+    if (!attachmentFailure || !imageFile || !onRetryAttachment) return;
+    setRetryingAttachment(true);
+    const uploaded = await onRetryAttachment(attachmentFailure.item, imageFile);
+    setRetryingAttachment(false);
+    if (!uploaded) return;
+    setAttachmentFailure(null);
+    clearImage();
+    onClose?.();
+  }
 
   return (
     <section className={`panel add-panel${inline ? " column-quick-add" : ""}`} id={panelId} aria-label={inline ? `Add ${itemLabel.toLowerCase()}` : undefined} aria-labelledby={inline || isMaintenanceQuickAdd ? undefined : "add-work-title"} hidden={!isOpen}>
@@ -225,12 +256,14 @@ export function QuickAddPanel({
         <form
           className={`add-form${draft.kind === "material" ? " has-material-type" : ""}${presetKind ? " has-preset-type" : ""}`}
           onSubmit={async (event) => {
-            const added = await onSubmit(event, imageFile);
-            if (added) {
-              setImageFile(null);
-              setImageInputKey((current) => current + 1);
-              onClose?.();
+            const result = await onSubmit(event, imageFile);
+            if (!result) return;
+            if (result.attachmentError) {
+              setAttachmentFailure(result);
+              return;
             }
+            clearImage();
+            onClose?.();
           }}
         >
           {showKindChoices && (
@@ -316,21 +349,40 @@ export function QuickAddPanel({
               maxLength="500"
             />
           </label>
-          <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor="new-item-image" title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
+          <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor={`${panelId}-image`} title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
             <ImagePlus size={18} aria-hidden="true" />
             <span>Add Image</span>
             <input
               key={imageInputKey}
-              id="new-item-image"
+              id={`${panelId}-image`}
               name="image"
               type="file"
               accept="image/*"
-              onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+              capture="environment"
+              onChange={(event) => {
+                setAttachmentFailure(null);
+                setImageFile(event.target.files?.[0] || null);
+              }}
             />
           </label>
-          <div className="add-form-actions">
-            <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> {isMaintenanceQuickAdd ? `Add ${draft.kind}` : "Add"}</button>
-          </div>
+          {imageFile && <div className="quick-add-image-preview" role="status">
+            {imagePreviewUrl && <img src={imagePreviewUrl} alt="Selected photo preview" />}
+            <span><strong>Photo ready</strong><small>{imageFile.name || "Camera photo"} · {formatBytes(imageFile.size)}</small></span>
+            <button className="icon-button" type="button" onClick={clearImage} aria-label="Remove selected photo"><X size={16} aria-hidden="true" /></button>
+          </div>}
+          {attachmentFailure ? (
+            <div className="quick-add-attachment-error" role="alert">
+              <p><strong>Task added, but the photo was not saved.</strong> {attachmentFailure.attachmentError}</p>
+              <div>
+                <button type="button" onClick={retryAttachment} disabled={retryingAttachment}>{retryingAttachment ? "Retrying photo…" : "Retry photo upload"}</button>
+                <button className="ghost" type="button" onClick={() => { setAttachmentFailure(null); clearImage(); onClose?.(); }}>Continue without photo</button>
+              </div>
+            </div>
+          ) : (
+            <div className="add-form-actions">
+              <button disabled={busy} type="submit"><Plus size={17} aria-hidden="true" /> {busy && imageFile ? "Uploading photo…" : isMaintenanceQuickAdd ? `Add ${draft.kind}` : "Add"}</button>
+            </div>
+          )}
         </form>
       </div>
     </section>

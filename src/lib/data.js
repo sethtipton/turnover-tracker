@@ -158,7 +158,7 @@ export async function loadPortfolioOverview(workspaceId) {
   const [itemsResult, activityResult] = await Promise.all([
     supabase
       .from("items")
-      .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at,attachments(id,storage_path,file_name)")
+      .select("id,property_id,unit_id,title,kind,material_type,status,created_at,updated_at,completed_at,attachments(id,storage_path,file_name,mime_type)")
       .eq("workspace_id", workspaceId)
       .is("archived_at", null),
     supabase
@@ -232,6 +232,7 @@ export function watchPortfolioData(workspaceId, callback) {
   const channel = supabase
     .channel(`portfolio-${workspaceId}-${crypto.randomUUID()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, callback)
+    .on("postgres_changes", { event: "*", schema: "public", table: "attachments", filter }, callback)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log", filter }, callback)
     .subscribe();
 
@@ -281,14 +282,20 @@ export async function deleteItem(id) {
 }
 
 export async function uploadAttachment({ workspaceId, propertyId, unitId, itemId, file, kind }) {
-  const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
+  if (!(file instanceof File)) throw new Error("Choose a photo or audio file before uploading.");
+  if (file.size === 0) throw new Error(`"${file.name || "Selected file"}" is empty. Please capture or choose it again.`);
+  if (file.size > 50 * 1024 * 1024) throw new Error(`"${file.name || "Selected file"}" is larger than the 50 MB attachment limit.`);
+
+  const fallbackName = `attachment-${Date.now()}${getFileExtension(file.type)}`;
+  const originalName = file.name || fallbackName;
+  const safeName = originalName.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
   const scopePath = unitId || "whole-property";
   const path = `${workspaceId}/${propertyId}/${scopePath}/${itemId}/${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from("turnover-attachments")
     .upload(path, file, { upsert: false });
 
-  if (uploadError) throw uploadError;
+  if (uploadError) throw new Error(`Could not upload "${originalName}": ${uploadError.message}`);
 
   const { data, error } = await supabase
     .from("attachments")
@@ -298,7 +305,7 @@ export async function uploadAttachment({ workspaceId, propertyId, unitId, itemId
       unit_id: unitId || null,
       item_id: itemId,
       kind,
-      file_name: file.name,
+      file_name: originalName,
       mime_type: file.type || "application/octet-stream",
       storage_path: path,
       delete_after: kind === "audio" ? getThreeYearDeleteDate() : null,
@@ -306,7 +313,10 @@ export async function uploadAttachment({ workspaceId, propertyId, unitId, itemId
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    await supabase.storage.from("turnover-attachments").remove([path]);
+    throw new Error(`The file uploaded, but its attachment record could not be saved: ${error.message}`);
+  }
   return data;
 }
 
@@ -332,4 +342,13 @@ function getThreeYearDeleteDate() {
   const date = new Date();
   date.setFullYear(date.getFullYear() + 3);
   return date.toISOString();
+}
+
+function getFileExtension(mimeType) {
+  if (mimeType === "image/jpeg") return ".jpg";
+  if (mimeType === "image/png") return ".png";
+  if (mimeType === "image/webp") return ".webp";
+  if (mimeType === "image/heic") return ".heic";
+  if (mimeType === "audio/webm") return ".webm";
+  return "";
 }

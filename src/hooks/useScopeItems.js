@@ -72,9 +72,11 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage, onIt
         status: "approved",
         sort_order: getNextQueueSortOrder(items, draft),
       });
+      let attachment = null;
+      let attachmentError = "";
       if (imageFile) {
         try {
-          await uploadAttachment({
+          attachment = await uploadAttachment({
             workspaceId,
             propertyId,
             unitId: unitId || null,
@@ -83,15 +85,16 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage, onIt
             kind: getAttachmentKind(imageFile, "photo"),
           });
         } catch (error) {
-          await deleteItem(item.id);
-          throw error;
+          attachmentError = error.message;
         }
       }
-      const nextItem = { ...item, attachments: [] };
+      const nextItem = { ...item, attachments: attachment ? [attachment] : [] };
       setItems((current) => [...current, nextItem]);
       onItemAdded?.(nextItem);
-      onMessage(`${title} added.`);
-      return nextItem;
+      onMessage(attachmentError
+        ? `${title} added, but its photo needs to be uploaded again.`
+        : `${title} added${attachment ? " with photo." : "."}`);
+      return { item: nextItem, attachmentError };
     });
   }
 

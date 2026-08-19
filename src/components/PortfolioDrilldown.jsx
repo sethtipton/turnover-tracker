@@ -1,5 +1,6 @@
 import { ArrowRight, Check, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AttachmentList } from "./ItemColumn";
 import { getScopePath } from "../lib/routing";
 
 const PANEL_CONFIG = {
@@ -40,6 +41,7 @@ export function PortfolioDrilldown({
   onOpenScope,
   onItemChange,
   onDeleteItem,
+  mediaUrls,
 }) {
   const config = PANEL_CONFIG[panel];
   const groups = useMemo(
@@ -64,6 +66,7 @@ export function PortfolioDrilldown({
                 onOpenScope={onOpenScope}
                 onItemChange={onItemChange}
                 onDeleteItem={onDeleteItem}
+                mediaUrls={mediaUrls}
               />
             ))}
           </div>
@@ -131,7 +134,7 @@ function ShoppingRunList({ panel, title, groups, busy, onItemChange }) {
   );
 }
 
-function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onItemChange, onDeleteItem }) {
+function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onItemChange, onDeleteItem, mediaUrls }) {
   const [isOpen, setIsOpen] = useState(false);
   const contentId = `portfolio-group-items-${group.property.id}`;
   const scopeGroups = group.units.length > 0
@@ -178,6 +181,7 @@ function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onIt
                 busy={busy}
                 onItemChange={onItemChange}
                 onDeleteItem={onDeleteItem}
+                mediaUrls={mediaUrls}
               />
             </section>
           ))}
@@ -191,13 +195,14 @@ function PropertyItemGroup({ group, collapsible, action, busy, onOpenScope, onIt
           busy={busy}
           onItemChange={onItemChange}
           onDeleteItem={onDeleteItem}
+          mediaUrls={mediaUrls}
         />
       )}
     </section>
   );
 }
 
-function PortfolioItemList({ id, hidden, entries, action, busy, onItemChange, onDeleteItem }) {
+function PortfolioItemList({ id, hidden, entries, action, busy, onItemChange, onDeleteItem, mediaUrls }) {
   return (
     <ul className="portfolio-item-list" id={id} role="list" hidden={hidden}>
       {entries.map(({ item }) => (
@@ -208,13 +213,14 @@ function PortfolioItemList({ id, hidden, entries, action, busy, onItemChange, on
           busy={busy}
           onItemChange={onItemChange}
           onDeleteItem={onDeleteItem}
+          mediaUrls={mediaUrls}
         />
       ))}
     </ul>
   );
 }
 
-function PortfolioItemRow({ item, action, busy, onItemChange, onDeleteItem }) {
+function PortfolioItemRow({ item, action, busy, onItemChange, onDeleteItem, mediaUrls }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [working, setWorking] = useState(false);
@@ -272,6 +278,7 @@ function PortfolioItemRow({ item, action, busy, onItemChange, onDeleteItem }) {
           </p>
         )}
       </div>
+      <AttachmentList attachments={item.attachments} mediaUrls={mediaUrls} />
       {!editing && (
         <div className="portfolio-item-actions">
           <button className="portfolio-status-action" type="button" onClick={runAction} disabled={busy || working}>

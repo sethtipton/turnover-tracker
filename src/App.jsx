@@ -379,7 +379,8 @@ function App() {
   }, [selectedPropertyId, selectedUnitId]);
 
   useEffect(() => {
-    const attachments = items.flatMap((item) => item.attachments || []);
+    const attachmentSourceItems = selectedPropertyId ? items : portfolioItems;
+    const attachments = attachmentSourceItems.flatMap((item) => item.attachments || []);
     const missingByPath = new Map();
     for (const attachment of attachments) {
       if (
@@ -411,7 +412,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [items, mediaUrls]);
+  }, [items, mediaUrls, portfolioItems, selectedPropertyId]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -438,6 +439,7 @@ function App() {
     : activeItems.filter((item) => item.kind === "task");
   const shoppingItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "shopping");
   const collectItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "collect");
+  const activeCollectItemCount = collectItems.filter((item) => item.status !== "done").length;
   const recordingItems = activeItems.filter((item) => item.kind === "dictation");
 
   function handlePropertyChange(propertyId) {
@@ -474,8 +476,6 @@ function App() {
     if (existingTimer) window.clearTimeout(existingTimer);
 
     setColumnOpenRequests((current) => ({ ...current, [target]: current[target] + 1 }));
-    setSummaryAddOpen(false);
-    setAddWorkTarget("");
     setDraft(emptyDraft);
     setEnteringItemIds((current) => new Set(current).add(item.id));
     enteringItemTimersRef.current.set(item.id, window.setTimeout(() => {
@@ -641,6 +641,10 @@ function App() {
     return addWork(draft, imageFile);
   }
 
+  async function handleRetryItemAttachment(item, file) {
+    return uploadFiles(item, [file], "photo");
+  }
+
   function handleMaintenancePreview(preview) {
     const nextPreview = {
       mode: preview.mode,
@@ -751,6 +755,7 @@ function App() {
         busy={busy}
         onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
         onSubmit={handleAddItem}
+        onRetryAttachment={handleRetryItemAttachment}
         isOpen
         onClose={() => setAddWorkTarget("")}
       />
@@ -775,7 +780,7 @@ function App() {
         {!compact && (
           <div className="materials-row">
             <ItemColumn title="Shopping List" tone="shopping" items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} quickAddOpen={addWorkTarget === "shopping"} onQuickAdd={() => handleColumnQuickAdd("shopping")} quickAddPanel={renderColumnQuickAdd("shopping", "shopping-list-items-quick-add")} enteringItemIds={enteringItemIds} />
-            <ItemColumn title="Collect / Bring" tone="collect" items={collectItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.collect} quickAddOpen={addWorkTarget === "collect"} onQuickAdd={() => handleColumnQuickAdd("collect")} quickAddPanel={renderColumnQuickAdd("collect", "collect-bring-items-quick-add")} enteringItemIds={enteringItemIds} />
+            <ItemColumn title="Collect / Bring" tone="collect" items={collectItems} itemCount={activeCollectItemCount} itemCountLabel={`${activeCollectItemCount} active collect or bring items`} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.collect} quickAddOpen={addWorkTarget === "collect"} onQuickAdd={() => handleColumnQuickAdd("collect")} quickAddPanel={renderColumnQuickAdd("collect", "collect-bring-items-quick-add")} enteringItemIds={enteringItemIds} />
           </div>
         )}
         {!compact && (
@@ -905,6 +910,7 @@ function App() {
                   onOpenScope={handleOpenScope}
                   onItemChange={handlePortfolioItemChange}
                   onDeleteItem={handleDeletePortfolioItem}
+                  mediaUrls={mediaUrls}
                 />
                 <StatusMessage message={message} onDismiss={setMessage} />
               </>
@@ -952,6 +958,7 @@ function App() {
                   busy={busy}
                   onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                   onSubmit={handleAddItem}
+                  onRetryAttachment={handleRetryItemAttachment}
                   isOpen={summaryAddOpen}
                   onClose={() => setSummaryAddOpen(false)}
                 />

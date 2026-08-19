@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, CirclePlus, FileAudio, ListChecks, Mic, RefreshCw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
-import { addItem, deleteItem, loadItems, uploadAttachment } from "../lib/data";
+import { addItem, loadItems, uploadAttachment } from "../lib/data";
 import {
   REQUEST_STATUS_LABELS,
   addMaintenanceInformation,
@@ -196,19 +196,18 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
   return (
     <section className="maintenance-workspace" aria-labelledby="maintenance-title">
       <header className="maintenance-header">
-        <div>
+        <div className="maintenance-header-copy">
           <h2 id="maintenance-title"><Sparkles size={22} aria-hidden="true" /> Maintenance case files <button className="maintenance-title-toggle" type="button" aria-expanded={showMaintenanceOverview} aria-controls="maintenance-overview" onClick={() => setShowMaintenanceOverview((current) => !current)}><ChevronDown size={20} aria-hidden="true" /><span className="visually-hidden">{showMaintenanceOverview ? "Hide" : "Show"} maintenance overview</span></button></h2>
           <div id="maintenance-overview" hidden={!showMaintenanceOverview}>
             <p>Use Maintenance to keep repair requests and walkthrough findings organized in one place. Tenants can submit an issue with a note, photos, or a voice message from their maintenance link; each submission becomes a case file they can revisit to see its status. Property admins can review the request, add internal details, approve or ignore AI-suggested tasks and materials, and close the case when the issue is resolved. For on-site inspections, open Start a maintenance report, record a walkthrough, and let the app split distinct observations into reviewable cases; use the Tasks tab for everyday work that does not need a tenant-facing case file.</p>
             <button className="ghost" type="button" onClick={() => openPreview("tenant")} disabled={!selectedPropertyId || propertyUnits.length === 0}><ShieldCheck size={17} aria-hidden="true" /> Preview tenant form <ArrowRight size={17} aria-hidden="true" /></button>
           </div>
         </div>
+        <section className="maintenance-filter-bar" aria-label="Maintenance request scope">
+          <label htmlFor="maintenance-property"><span>Property</span><select id="maintenance-property" value={selectedPropertyId} onChange={(event) => setSelectedPropertyId(event.target.value)}>{properties.map((property) => <option value={property.id} key={property.id}>{property.name}</option>)}</select></label>
+          <label htmlFor="maintenance-unit"><span>Unit or scope</span><select id="maintenance-unit" value={selectedUnitId} onChange={(event) => setSelectedUnitId(event.target.value)}><option value="">Whole property / all scopes</option>{propertyUnits.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
+        </section>
       </header>
-
-      <section className="maintenance-filter-bar" aria-label="Maintenance request scope">
-        <label htmlFor="maintenance-property"><span>Property</span><select id="maintenance-property" value={selectedPropertyId} onChange={(event) => setSelectedPropertyId(event.target.value)}>{properties.map((property) => <option value={property.id} key={property.id}>{property.name}</option>)}</select></label>
-        <label htmlFor="maintenance-unit"><span>Unit or scope</span><select id="maintenance-unit" value={selectedUnitId} onChange={(event) => setSelectedUnitId(event.target.value)}><option value="">Whole property / all scopes</option>{propertyUnits.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
-      </section>
 
       {selectedProperty && (
         <div className="maintenance-intake-actions">
@@ -280,6 +279,7 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
         status: "approved",
         sort_order: existingItems.length + 1,
       });
+      let attachmentError = "";
       if (imageFile) {
         try {
           await uploadAttachment({
@@ -291,12 +291,34 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
             kind: getAttachmentKind(imageFile, "photo"),
           });
         } catch (error) {
-          await deleteItem(item.id);
-          throw error;
+          attachmentError = error.message;
         }
       }
       setQuickAddDraft(emptyQuickAddDraft);
-      onMessage(`${title} added.`);
+      onMessage(attachmentError
+        ? `${title} added, but its photo needs to be uploaded again.`
+        : `${title} added.`);
+      return { item, attachmentError };
+    } catch (error) {
+      onMessage(error.message);
+      return false;
+    } finally {
+      setQuickAddBusy(false);
+    }
+  }
+
+  async function retryQuickWorkAttachment(item, file) {
+    setQuickAddBusy(true);
+    try {
+      await uploadAttachment({
+        workspaceId,
+        propertyId: item.property_id,
+        unitId: item.unit_id,
+        itemId: item.id,
+        file,
+        kind: getAttachmentKind(file, "photo"),
+      });
+      onMessage(`Photo attached to ${item.title}.`);
       return true;
     } catch (error) {
       onMessage(error.message);
@@ -321,7 +343,7 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
       <details className="admin-intake-choice admin-quick-add" name="admin-maintenance-method" open={quickAddOpen} onToggle={(event) => setQuickAddOpen(event.currentTarget.open)}>
         <summary><span className="admin-intake-choice-icons"><ChevronRight className="admin-intake-choice-icon" size={20} aria-hidden="true" /></span><span><strong>Quick add</strong><small>Already know exactly what needs to be done or purchased? Add it directly.</small></span><CirclePlus className="admin-intake-choice-workflow-icon" size={19} aria-hidden="true" /></summary>
         <div id="maintenance-quick-add">
-          <QuickAddPanel variant="maintenance" draft={quickAddDraft} busy={quickAddBusy} onDraftChange={(patch) => setQuickAddDraft((current) => ({ ...current, ...patch }))} onSubmit={addQuickWork} isOpen onClose={() => setQuickAddOpen(false)} />
+          <QuickAddPanel variant="maintenance" draft={quickAddDraft} busy={quickAddBusy} onDraftChange={(patch) => setQuickAddDraft((current) => ({ ...current, ...patch }))} onSubmit={addQuickWork} onRetryAttachment={retryQuickWorkAttachment} isOpen onClose={() => setQuickAddOpen(false)} />
         </div>
       </details>
       <details className="admin-intake-choice admin-walkthrough-option" name="admin-maintenance-method">
