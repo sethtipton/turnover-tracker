@@ -34,6 +34,12 @@
     --color-on-action: #151107;
 
     --content-width: min(80rem, calc(100% - 2rem));
+    /*
+     * Sizing model: typography and spacing use rem so they follow the
+     * browser/user root font size. Responsive rules may intentionally choose
+     * different rem values or use vw for fluid type; px remains appropriate
+     * for hairlines and the 16px mobile form-control exception below.
+     */
     /* Typography scale shared by page, panel, and control text. */
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
@@ -104,6 +110,13 @@ dl {
 }
 
 @layer base {
+  html {
+    /* Keep rem based on the browser/user default; do not replace with a fixed pixel size. */
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     min-width: 20rem;
     min-height: 100svh;
@@ -159,6 +172,7 @@ dl {
     background: var(--color-field);
     color: var(--color-text);
     font-weight: var(--font-weight-semibold);
+    /* Keep text controls at 16 CSS px to avoid iOS focus zoom. */
     font-size: 16px;
   }
 
