@@ -25,3 +25,12 @@ Emails contain the property, request text, supplied contact details, photo/audio
 - Review failed rows and provider records before any manual retry. Never blindly reset an ambiguous old delivery.
 - Stop sending with MAINTENANCE_EMAIL_ENABLED=false; disable recipient opt-in to cancel outstanding alerts for that recipient. Public requests and the admin inbox continue working.
 - Account creation, sender verification, scheduler activation and actual inbox delivery must be reported separately from passing mocked tests. Until completed, phase 2 is deployed but not activated.
+
+## Setup progress — September 20, 2026
+
+- Resend account connected; server API key and worker job secret stored in Supabase secrets.
+- Created notifications.treecityrentals.com in Resend; domain verification still pending Bluehost DNS setup.
+- Installed pg_cron and pg_net and the deliver-maintenance-emails job (once per minute). Worker credentials are read from Vault.
+- A connection test from onboarding@resend.dev was accepted by Resend and visibly received in Gmail. This verifies the provider connection, not the complete maintenance workflow or branded sender.
+- Live worker checks: invalid authorization returns 401; valid authorization while disabled returns 200 with paused=true.
+- Maintenance delivery remains disabled and all recipient opt-ins remain false until sender verification and the Carthage pilot.
