@@ -26,11 +26,18 @@ Emails contain the property, request text, supplied contact details, photo/audio
 - Stop sending with MAINTENANCE_EMAIL_ENABLED=false; disable recipient opt-in to cancel outstanding alerts for that recipient. Public requests and the admin inbox continue working.
 - Account creation, sender verification, scheduler activation and actual inbox delivery must be reported separately from passing mocked tests. Until completed, phase 2 is deployed but not activated.
 
-## Setup progress — September 20, 2026
+## Pilot results — September 20, 2026
 
-- Resend account connected; server API key and worker job secret stored in Supabase secrets.
-- Created notifications.treecityrentals.com in Resend; domain verification still pending Bluehost DNS setup.
-- Installed pg_cron and pg_net and the deliver-maintenance-emails job (once per minute). Worker credentials are read from Vault.
-- A connection test from onboarding@resend.dev was accepted by Resend and visibly received in Gmail. This verifies the provider connection, not the complete maintenance workflow or branded sender.
-- Live worker checks: invalid authorization returns 401; valid authorization while disabled returns 200 with paused=true.
-- Maintenance delivery remains disabled and all recipient opt-ins remain false until sender verification and the Carthage pilot.
+Phase 2 is active for sethtipton@gmail.com at 469 Carthage only. Other memberships remain opted out. The website remains on GitHub Pages; phase 3 has not started.
+
+- Added three Bluehost DNS records at the existing default four-hour TTL: TXT resend._domainkey.notifications (Resend DKIM public key), CNAME rsend.notifications → rsend.forge.rmta.net, and CNAME send.notifications → send.forge.rmta.net. Existing root website, mail and nameserver records were unchanged.
+- Resend verified notifications.treecityrentals.com. Sender is Tree City Rentals <maintenance@notifications.treecityrentals.com>.
+- The API key and worker job secret are in Supabase server secrets; the scheduler reads its credentials from Vault. No credentials are committed.
+- Enabled the scheduled worker and only Seth's existing Carthage admin membership. pg_cron runs every minute, invoking the worker only when delivery is due.
+- Anonymous pilot submission returned 201; identical replay returned 200. Exactly one case and one email notification were created, with one photo and one audio attachment.
+- Case f8319daa-d112-4ef4-bfce-b2d342950955 is labeled [Phase 2 TEST] Carthage email pilot. Synthetic test only; no repair needed. It is retained for review.
+- The scheduled worker sent the queued notification on its first attempt. Resend reported delivered; Gmail visibly received it. No manual worker invocation was needed.
+- Gmail showed the intended sender, tenant Reply-To (a test alias of Seth's Gmail), request text, supplied contact fields, 1 photo / 1 voice message, and the correct authenticated View request URL. The published inbox opened the matching case with its media. Google sign-in return routing was verified during deployment.
+- IMPORTANT: Gmail classified this first branded email as Spam. It displayed the expected mailed-by and signed-by domains and TLS. Provider delivery is proven; reliable inbox placement is not. Mark the legitimate pilot message “Report not spam” and retest before relying on email alone. The app inbox remains the authoritative request record.
+- Live worker authorization checks: invalid authorization returned 401; valid authorization while disabled returned 200 with paused=true.
+- Validation from deployment: 62 app tests, database RLS/intake/outbox checks, lint and build passed. Build retains the pre-existing bundle-size warning.
