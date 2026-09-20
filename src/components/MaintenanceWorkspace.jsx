@@ -8,6 +8,7 @@ import {
   approveMaintenanceItem,
   getMaintenanceAttachmentUrl,
   loadAdminMaintenanceDetail,
+  loadMaintenanceRequestById,
   loadMaintenanceRequests,
   processMaintenanceRequest,
   rejectMaintenanceItem,
@@ -29,7 +30,7 @@ const emptyQuickAddDraft = {
   material_type: "shopping",
 };
 
-export function MaintenanceWorkspace({ user, workspace, properties, units, initialPropertyId, initialUnitId, onPreview }) {
+export function MaintenanceWorkspace({ user, workspace, properties, units, initialPropertyId, initialUnitId, initialRequestId = "", onPreview }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState(initialPropertyId || properties[0]?.id || "");
   const [selectedUnitId, setSelectedUnitId] = useState(initialUnitId || "");
   const [requests, setRequests] = useState([]);
@@ -40,6 +41,7 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
   const [showMaintenanceOverview, setShowMaintenanceOverview] = useState(false);
   const [detailVersion, setDetailVersion] = useState(0);
   const refreshSequence = useRef(0);
+  const linkedRequest = useRef(initialRequestId);
 
   const propertyUnits = useMemo(() => units.filter((unit) => unit.property_id === selectedPropertyId), [selectedPropertyId, units]);
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
@@ -56,6 +58,28 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
     try {
       const all = await loadMaintenanceRequests({ workspaceId: workspace.id });
       if (sequence !== refreshSequence.current) return;
+      const requestedId = linkedRequest.current;
+      if (requestedId) {
+        // Resolve through the authenticated/RLS-filtered inbox, never through a
+        // public lookup. The request itself determines the correct scope.
+        const target = all.find((request) => request.id === requestedId) || await loadMaintenanceRequestById(requestedId);
+        if (sequence !== refreshSequence.current) return;
+        if (!target) {
+          linkedRequest.current = "";
+          setMessage("This request is unavailable or you don’t have access to it.");
+          setRequests([]);
+          setDetail(null);
+          setSelectedRequestId("");
+          return;
+        }
+        if (target.property_id !== selectedPropertyId || (target.unit_id || "") !== selectedUnitId) {
+          setSelectedPropertyId(target.property_id);
+          setSelectedUnitId(target.unit_id || "");
+          return;
+        }
+        if (!all.some((request) => request.id === target.id)) all.unshift(target);
+        linkedRequest.current = "";
+      }
       const scoped = all.filter((request) => (
         (!selectedPropertyId || request.property_id === selectedPropertyId)
         && (!selectedUnitId || request.unit_id === selectedUnitId)
@@ -65,9 +89,9 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
       if (scoped.length === 0) setDetail(null);
       const preferredRequests = scoped.filter((request) => request.status !== "resolved");
       setSelectedRequestId((currentId) => (
-        retain && scoped.some((request) => request.id === currentId)
+        requestedId || (retain && scoped.some((request) => request.id === currentId)
           ? currentId
-          : preferredRequests[0]?.id || scoped[0]?.id || ""
+          : preferredRequests[0]?.id || scoped[0]?.id || "")
       ));
     } catch (error) {
       setMessage(error.message);
@@ -236,8 +260,10 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
       )}
       <div className="maintenance-content-grid">
         <nav className="maintenance-case-list" aria-label="Maintenance requests">
-          <h3>Open case files</h3>
-          <button className="ghost" type="button" onClick={() => refresh()} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> Refresh inbox</button>
+          <div className="maintenance-case-list-header">
+            <h3>Open case files</h3>
+            <button className="ghost maintenance-inbox-refresh" type="button" onClick={() => refresh()} disabled={busy}><RefreshCw size={16} aria-hidden="true" /><span>Refresh inbox</span></button>
+          </div>
           {openRequests.length === 0 ? <p className="empty">No open maintenance requests in this scope.</p> : <CaseFileList requests={openRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} />}
           {resolvedRequests.length > 0 && <details className="resolved-case-list"><summary>Resolved cases ({resolvedRequests.length})</summary><CaseFileList requests={resolvedRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} /></details>}
         </nav>

@@ -4078,7 +4078,12 @@ ul.admin-walkthrough-steps {
   gap: var(--space-3);
 }
 
-.maintenance-case-list button,
+.maintenance-case-list { min-inline-size: 0; }
+.maintenance-case-list-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-block-end: var(--space-4); }
+.maintenance-inbox-refresh { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); flex-shrink: 0; }
+.maintenance-inbox-refresh svg { flex-shrink: 0; }
+
+.maintenance-case-list li > button,
 .tenant-request-list button {
   display: grid;
   width: 100%;
@@ -4091,13 +4096,23 @@ ul.admin-walkthrough-steps {
   background: transparent;
 }
 
-.maintenance-case-list button:hover,
+.maintenance-case-list li > button {
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  justify-items: start;
+  align-items: start;
+  padding: var(--space-5);
+  line-height: 1.4;
+}
+.maintenance-case-list li > button > :is(span, small) { min-inline-size: 0; max-inline-size: 100%; overflow-wrap: anywhere; }
+
+.maintenance-case-list li > button:hover,
 .tenant-request-list button:hover {
   border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
   background: transparent;
 }
 
-.maintenance-case-list button.active,
+.maintenance-case-list li > button.active,
 .tenant-request-list button.active {
   border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
@@ -4435,6 +4450,7 @@ ul.admin-walkthrough-steps {
 
 @media (max-width: 760px) {
   .tenant-header,
+  .maintenance-header,
   .maintenance-content-grid,
   .tenant-request-area,
   .admin-intake,
@@ -4580,6 +4596,8 @@ ul.admin-walkthrough-steps {
   gap: var(--space-3);
   margin: 0;
 }
+.tenant-qr-header h1 svg { flex-shrink: 0; }
+.tenant-qr-header h1 span { min-inline-size: 0; }
 
 .tenant-qr-card { padding: clamp(1.25rem, 3vw, 2.25rem); }
 .tenant-qr-empty { display: grid; justify-items: start; gap: var(--space-3); }
@@ -4633,14 +4651,49 @@ ul.admin-walkthrough-steps {
 .public-contact-fields label { min-inline-size: 0; }
 .maintenance-success { outline: none; }
 
+.public-voice-message {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  padding-block: var(--space-3);
+}
+.public-recording-status,
+.public-recording-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.public-recording-status { margin: 0; font-weight: var(--font-weight-bold); color: var(--color-success); }
+.public-voice-message[data-state="recording"] .public-recording-status { color: var(--color-danger); }
+.public-voice-message[data-state="requesting"] .public-recording-status,
+.public-voice-message[data-state="finalizing"] .public-recording-status { color: var(--color-text-muted); }
+.public-recording-dot { inline-size: .65rem; block-size: .65rem; border-radius: 50%; background: currentColor; }
+.public-recording-timer { font-variant-numeric: tabular-nums; }
+.public-voice-message audio { display: block; inline-size: 100%; min-inline-size: 0; }
+.public-maintenance-composer .tenant-upload-button { display: inline-flex; }
+.public-maintenance-composer .tenant-upload-button svg { flex-shrink: 0; }
+
+.maintenance-receipt { display: grid; gap: var(--space-7); inline-size: 100%; margin: var(--space-3) 0 0; padding-block-start: var(--space-7); border-block-start: 1px solid var(--color-border); }
+.maintenance-receipt dt { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.maintenance-receipt dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+.maintenance-receipt-description { white-space: pre-wrap; }
+
 @media (pointer: coarse) {
   .public-maintenance-composer .tenant-media-actions > :is(button, .tenant-upload-button),
+  .public-recording-controls button,
   .public-maintenance-composer button[type="submit"] { min-block-size: 3rem; }
 }
 
 @media (max-width: 760px) {
   .public-contact-fields { grid-template-columns: minmax(0, 1fr); }
   .public-maintenance-composer .tenant-media-actions > :is(button, .tenant-upload-button) { flex: 1 1 100%; }
+  .public-recording-controls button:first-child { flex: 1; min-block-size: 3rem; }
+}
+
+@media (max-width: 480px) {
+  .tenant-qr-header h1 { gap: var(--space-2); font-size: clamp(1rem, 4.6vw, 1.125rem); line-height: 1.3; }
+  .tenant-qr-header h1 svg { inline-size: 1.125rem; block-size: 1.125rem; }
 }
 
 @media (max-width: 760px) {

@@ -124,6 +124,17 @@ export function getMaintenancePath() {
   return `${basePath}maintenance/`;
 }
 
+export function getMaintenanceRequestLinkFromCurrentPath() {
+  if (!isMaintenanceRoute() || getCurrentRouteParts().length !== 1) return null;
+  const params = new URL(window.location.href).searchParams;
+  if (params.has("preview")) return null;
+  const requestId = params.get("request") || "";
+  const propertyId = params.get("property") || "";
+  const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+  if (!uuid.test(requestId)) return null;
+  return { requestId, propertyId: uuid.test(propertyId) ? propertyId : "" };
+}
+
 export function getMaintenanceQrPath(token) {
   return `${basePath}maintenance/q/${encodeURIComponent(token)}/`;
 }

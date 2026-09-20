@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, FileAudio, Mic, ShieldAlert, Wrench } from "lucide-react";
+import { Camera, CheckCircle2, Mic, ShieldAlert, Square, Wrench } from "lucide-react";
 import { inspectPublicMaintenanceCapability, submitPublicMaintenanceRequest } from "../lib/maintenance";
 import { isMaintenanceQrToken } from "../lib/maintenanceQr";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
-import { formatBytes, formatDuration } from "../lib/media";
+import { formatDuration } from "../lib/media";
 
 const MAX_PHOTOS = 5;
 
@@ -41,7 +41,7 @@ export function MaintenanceQrRoute({ token }) {
       <main className="tenant-qr-shell" id="maintenance-qr-content" tabIndex="-1">
         <header className="tenant-qr-header">
           <p className="eyebrow">Tree City Rentals</p>
-          <h1><Wrench size={25} aria-hidden="true" /> Submit a maintenance request</h1>
+          <h1><Wrench size={25} aria-hidden="true" /><span>Submit a maintenance request</span></h1>
         </header>
 
         {state.kind === "loading" && <section className="tenant-qr-card" aria-live="polite"><p>Checking this maintenance link…</p></section>}
@@ -69,7 +69,7 @@ function PublicMaintenanceForm({ token, scope }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [recorderMessage, setRecorderMessage] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [receipt, setReceipt] = useState(null);
   const successRef = useRef(null);
   const pendingSubmission = useRef(null);
   const sendingRef = useRef(false);
@@ -78,10 +78,17 @@ function PublicMaintenanceForm({ token, scope }) {
   const recording = recordings[0] || null;
   const isRecording = recordingState === "recording";
   const recordingBusy = recordingState !== "idle";
+  const homeName = scope.unitName.trim().toLowerCase() === "main unit"
+    ? scope.propertyName
+    : `${scope.propertyName} · ${scope.unitName}`;
+  const recordingStatus = isRecording ? "Recording" : recordingState === "finalizing"
+    ? "Finishing recording…" : recordingState === "requesting"
+      ? "Opening microphone…" : recording ? "Voice message ready" : "";
+  const recordingError = recorderMessage.startsWith("Recording ready") ? "" : recorderMessage;
 
   useEffect(() => {
-    if (submitted) successRef.current?.focus();
-  }, [submitted]);
+    if (receipt) successRef.current?.focus();
+  }, [receipt]);
 
   function handlePhotos(event) {
     const selected = [...event.target.files];
@@ -117,10 +124,11 @@ function PublicMaintenanceForm({ token, scope }) {
         contactPhone: contactPhone.trim(),
         photoFiles: photos,
         audioFile: recording?.file || null,
+        audioDurationMs: recording?.durationMs || 0,
       };
       setHasPendingSubmission(true);
       await submitPublicMaintenanceRequest(pendingSubmission.current);
-      setSubmitted(true);
+      setReceipt(pendingSubmission.current);
     } catch (submissionError) {
       if ([400, 404, 429].includes(submissionError.status)) {
         pendingSubmission.current = null;
@@ -133,12 +141,21 @@ function PublicMaintenanceForm({ token, scope }) {
     }
   }
 
-  if (submitted) {
+  if (receipt) {
     return (
       <section className="tenant-qr-card tenant-qr-empty maintenance-success" tabIndex="-1" ref={successRef} aria-labelledby="maintenance-success-title">
         <CheckCircle2 size={32} aria-hidden="true" />
         <h2 id="maintenance-success-title">Your request was received.</h2>
-        <p>Your maintenance request for {scope.propertyName} · {scope.unitName} is saved for the property team to review.</p>
+        <p>Your request has been saved for review. You can close this page.</p>
+        <dl className="maintenance-receipt">
+          <div><dt>Rental home</dt><dd>{homeName}</dd></div>
+          {receipt.description && <div><dt>Your request</dt><dd className="maintenance-receipt-description">{receipt.description}</dd></div>}
+          {receipt.photoFiles.length > 0 && <div><dt>Photos</dt><dd>{receipt.photoFiles.length} attached</dd></div>}
+          {receipt.audioFile && <div><dt>Voice message</dt><dd>{formatDuration(receipt.audioDurationMs)} recording attached</dd></div>}
+          {receipt.contactName && <div><dt>Name</dt><dd>{receipt.contactName}</dd></div>}
+          {receipt.contactEmail && <div><dt>Email</dt><dd>{receipt.contactEmail}</dd></div>}
+          {receipt.contactPhone && <div><dt>Phone</dt><dd>{receipt.contactPhone}</dd></div>}
+        </dl>
       </section>
     );
   }
@@ -147,8 +164,8 @@ function PublicMaintenanceForm({ token, scope }) {
     <>
       <section className="tenant-qr-card tenant-qr-scope" aria-labelledby="maintenance-qr-unit">
         <p className="eyebrow">Your rental home</p>
-        <h2 id="maintenance-qr-unit">{scope.propertyName} · {scope.unitName}</h2>
-        <p>This request will be sent directly to the team responsible for this unit.</p>
+        <h2 id="maintenance-qr-unit">{homeName}</h2>
+        <p>Your request will go to your property manager for review.</p>
       </section>
 
       <section className="tenant-composer public-maintenance-composer" aria-labelledby="public-maintenance-form-title">
@@ -162,18 +179,29 @@ function PublicMaintenanceForm({ token, scope }) {
           </label>
           <p id="public-maintenance-description-help" className="field-hint">Add a description, photos, or a voice recording. Please include anything urgent, such as an active leak.</p>
 
-          <div className="tenant-media-actions">
-            <button type="button" className={isRecording ? "recording" : ""} onClick={isRecording ? stop : start} disabled={busy || (recordingBusy && !isRecording)}>
-              <Mic size={17} aria-hidden="true" /> {isRecording ? "Stop recording" : recordingState === "finalizing" ? "Finishing recording…" : recordingState === "requesting" ? "Opening microphone…" : "Record voice message"}
+          <div className="public-voice-message" data-state={recordingState}>
+            {recordingStatus && <p className="public-recording-status">
+              {isRecording ? <span className="public-recording-dot" aria-hidden="true" /> : !recordingBusy && <CheckCircle2 size={18} aria-hidden="true" />}
+              <span role="status">{recordingStatus}</span>
+              {isRecording ? <RecordingTimer /> : !recordingBusy && recording && <span>· {formatDuration(recording.durationMs)}</span>}
+            </p>}
+            {recording && !recordingBusy && <audio controls preload="metadata" src={recording.url} aria-label="Play your voice message" />}
+            <div className="public-recording-controls">
+            <button type="button" className={isRecording ? "recording" : ""} onClick={() => { setRecorderMessage(""); if (isRecording) stop(); else start(); }} disabled={busy || (recordingBusy && !isRecording)}>
+              {isRecording ? <Square size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />} {isRecording ? "Stop recording" : recordingState === "finalizing" ? "Finishing recording…" : recordingState === "requesting" ? "Opening microphone…" : recording ? "Record again" : "Record voice message"}
             </button>
+            {recording && !recordingBusy && <button className="ghost" type="button" onClick={() => { recordings.forEach(({ id }) => removeRecording(id)); setRecorderMessage(""); }} disabled={busy}>Remove</button>}
+            </div>
+            {recording && !recordingBusy && recording.peakLevel < 0.015 && <p className="field-hint" role="status">The microphone picked up very little sound. Play your message to check it before sending.</p>}
+            {recordingError && <p className="maintenance-error" role="alert">{recordingError}</p>}
+          </div>
+          <div className="tenant-media-actions">
             <label className="tenant-upload-button" htmlFor="public-maintenance-photos">
               <Camera size={17} aria-hidden="true" /> Add photos
               <input id="public-maintenance-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple onChange={handlePhotos} disabled={busy} />
             </label>
           </div>
-          {recording && <div className="tenant-recording"><FileAudio size={17} aria-hidden="true" /><span>Voice message ready · {formatDuration(recording.durationMs)} · {formatBytes(recording.size)}</span><button type="button" onClick={() => removeRecording(recording.id)} disabled={busy}>Remove</button></div>}
           {photos.length > 0 && <p className="tenant-file-count">{photos.length} photo{photos.length === 1 ? "" : "s"} ready to send.</p>}
-          {recorderMessage && <p className="field-hint" role="status">{recorderMessage}</p>}
 
           <fieldset className="public-contact-fields">
             <legend>How should we contact you? <span>Optional</span></legend>
@@ -192,4 +220,14 @@ function PublicMaintenanceForm({ token, scope }) {
       </section>
     </>
   );
+}
+
+function RecordingTimer() {
+  const [startedAt] = useState(Date.now);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  return <span className="public-recording-timer" aria-label="Elapsed recording time">· {formatDuration(Math.floor(elapsedMs / 1000) * 1000)}</span>;
 }

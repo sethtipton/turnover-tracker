@@ -16,7 +16,7 @@ if (process.argv.includes("--rehearse")) {
 }
 const directory = mkdtempSync(join(tmpdir(), "maintenance-db-tests-"));
 try {
-  for (const name of ["maintenance_rls", "public_maintenance_submissions"]) {
+  for (const name of ["maintenance_rls", "public_maintenance_submissions", "maintenance_email"]) {
     let sql = stripTransaction(readFileSync(`supabase/tests/${name}.sql`, "utf8"));
     let prefix = "begin;\nset local statement_timeout='25s';\n" + migrations + "\n";
     if (name === "maintenance_rls") {

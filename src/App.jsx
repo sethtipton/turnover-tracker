@@ -45,6 +45,7 @@ import {
 } from "./lib/data";
 import {
   getMaintenanceQrTokenFromCurrentPath,
+  getMaintenanceRequestLinkFromCurrentPath,
   getMaintenancePreviewFromCurrentPath,
   getScopeFromCurrentPath,
   isMaintenanceQrRoute,
@@ -311,8 +312,11 @@ function App() {
           ? await loadPropertyMembers(workspaceData.id)
           : [];
         const maintenancePreviewScope = getMaintenancePreviewFromCurrentPath();
+        const maintenanceRequestLink = getMaintenanceRequestLinkFromCurrentPath();
         const routeScope = maintenancePreviewScope?.propertyId
           ? { propertyId: maintenancePreviewScope.propertyId, unitId: maintenancePreviewScope.unitId }
+          : propertyData.some((property) => property.id === maintenanceRequestLink?.propertyId)
+            ? { propertyId: maintenanceRequestLink.propertyId, unitId: "" }
           : getScopeFromCurrentPath(propertyData, unitData);
         if (!isMounted) return;
 
@@ -327,7 +331,7 @@ function App() {
         setSelectedUnitId(routeScope.unitId);
         setWorkspaceUserId(sessionUserId);
 
-        if (routeScope.propertyId) {
+        if (routeScope.propertyId && !isMaintenanceRoute()) {
           updateScopePath(
             propertyData.find((property) => property.id === routeScope.propertyId),
             unitData.find((unit) => unit.id === routeScope.unitId),
@@ -857,6 +861,7 @@ function App() {
             units={units}
             initialPropertyId={selectedPropertyId}
             initialUnitId={selectedUnitId}
+            initialRequestId={getMaintenanceRequestLinkFromCurrentPath()?.requestId || ""}
             onPreview={handleMaintenancePreview}
             onClose={() => {
               setMaintenanceOpen(false);

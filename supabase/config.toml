@@ -1,2 +1,6 @@
 [functions.submit-maintenance-request]
 verify_jwt = false
+
+[functions.deliver-maintenance-emails]
+# This scheduler-only endpoint verifies its own dedicated secret.
+verify_jwt = false

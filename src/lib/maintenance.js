@@ -30,6 +30,12 @@ export async function loadMaintenanceRequests({ workspaceId, tenant = false }) {
   return (data || []).map((request) => tenant ? toTenantRequest(request) : request);
 }
 
+export async function loadMaintenanceRequestById(requestId) {
+  const { data, error } = await supabase.from("maintenance_requests").select("*").eq("id", requestId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function loadAdminMaintenanceDetail(requestId) {
   const [requestResult, entriesResult, attachmentsResult, analysesResult, requestItemsResult, eventsResult] = await Promise.all([
     supabase.from("maintenance_requests").select("*").eq("id", requestId).single(),
