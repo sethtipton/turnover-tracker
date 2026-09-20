@@ -247,7 +247,8 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!sessionUserId || !restoreAuthReturnPath()) return;
+    if (!sessionUserId) return;
+    restoreAuthReturnPath();
     setMaintenanceOpen(isMaintenanceRoute());
   }, [sessionUserId]);
 
