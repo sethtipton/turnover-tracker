@@ -214,6 +214,8 @@ export async function inspectPublicMaintenanceCapability(token) {
 
 export async function submitPublicMaintenanceRequest({
   token,
+  submissionId,
+  website = "",
   description = "",
   contactName = "",
   contactEmail = "",
@@ -224,18 +226,21 @@ export async function submitPublicMaintenanceRequest({
   const form = new FormData();
   form.set("action", "submit");
   form.set("token", token);
+  form.set("submissionId", submissionId);
   form.set("description", description);
   form.set("contactName", contactName);
   form.set("contactEmail", contactEmail);
   form.set("contactPhone", contactPhone);
-  form.set("website", "");
+  form.set("website", website);
   photoFiles.forEach((file) => form.append("photos", file, file.name));
   if (audioFile) form.append("audio", audioFile, audioFile.name);
 
   const { data, error } = await supabase.functions.invoke("submit-maintenance-request", { body: form });
   if (error) {
     const detail = await readFunctionError(error);
-    throw new Error(detail || "We couldn’t send that request. Please try again.");
+    const submissionError = new Error(detail || "We couldn’t send that request. Please try again.");
+    submissionError.status = error.context?.status;
+    throw submissionError;
   }
   if (!data?.received) throw new Error("We couldn’t send that request. Please try again.");
   return data;

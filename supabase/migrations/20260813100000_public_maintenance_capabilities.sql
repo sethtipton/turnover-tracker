@@ -7,11 +7,12 @@ begin;
 drop function if exists public.resolve_maintenance_qr_token(text);
 drop function if exists public.get_my_maintenance_qr_context(text);
 drop function if exists public.regenerate_unit_maintenance_qr(uuid);
-drop function if exists public.generate_maintenance_qr_token();
 
 drop index if exists public.units_maintenance_qr_token_key;
 alter table public.units drop constraint if exists units_maintenance_qr_token_format_check;
 alter table public.units drop column if exists maintenance_qr_token;
+-- The legacy column default depends on this function; drop the column first.
+drop function if exists public.generate_maintenance_qr_token();
 
 alter table public.units
   add column if not exists maintenance_access_token_hash text,

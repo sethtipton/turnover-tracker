@@ -4592,6 +4592,15 @@ ul.admin-walkthrough-steps {
   padding: clamp(1.25rem, 3vw, 2.25rem);
 }
 
+.public-maintenance-inputs {
+  display: grid;
+  gap: 0.75rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .public-maintenance-composer textarea,
 .public-contact-fields input {
   inline-size: 100%;

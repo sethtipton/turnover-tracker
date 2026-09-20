@@ -12,6 +12,7 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
   const [level, setLevel] = useState(0);
   const [recordings, setRecordings] = useState([]);
   const mediaRecorderRef = useRef(null);
+  const recordingStateRef = useRef("idle");
   const chunksRef = useRef([]);
   const audioContextRef = useRef(null);
   const audioFrameRef = useRef(null);
@@ -28,6 +29,7 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
   }, []);
 
   async function start() {
+    if (recordingStateRef.current !== "idle") return;
     if (!enabled) {
       onMessage("Select a property before recording.");
       return;
@@ -39,6 +41,8 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
     }
 
     try {
+      recordingStateRef.current = "requesting";
+      setState("requesting");
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -59,6 +63,7 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
         stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setLevel);
         stream.getTracks().forEach((track) => track.stop());
         mediaRecorderRef.current = null;
+        recordingStateRef.current = "idle";
         setState("idle");
         onMessage("Recording stopped because the browser reported a microphone error.");
       };
@@ -68,6 +73,7 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
         const peakLevel = stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setLevel);
         stream.getTracks().forEach((track) => track.stop());
         setState("idle");
+        recordingStateRef.current = "idle";
         mediaRecorderRef.current = null;
 
         if (blob.size < 512) {
@@ -97,17 +103,21 @@ export function useAudioRecorder({ propertyId, unitId, enabled = Boolean(propert
 
       mediaRecorderRef.current = recorder;
       recorder.start(1000);
+      recordingStateRef.current = "recording";
       setState("recording");
       onMessage("");
     } catch (error) {
       stopAudioMonitor(audioContextRef, audioFrameRef, audioPeakRef, setLevel);
       onMessage(getMicrophoneErrorMessage(error));
+      recordingStateRef.current = "idle";
       setState("idle");
     }
   }
 
   function stop() {
     if (mediaRecorderRef.current?.state === "recording") {
+      recordingStateRef.current = "finalizing";
+      setState("finalizing");
       mediaRecorderRef.current.requestData();
       mediaRecorderRef.current.stop();
     }

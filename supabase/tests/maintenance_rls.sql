@@ -1,8 +1,8 @@
 begin;
-select plan(25);
+select plan(26);
 
 select ok(not has_function_privilege('anon', 'public.resolve_public_maintenance_capability(text)', 'execute'), 'anonymous callers cannot execute the QR capability resolver');
-select ok(not has_function_privilege('anon', 'public.claim_public_maintenance_submission(text)', 'execute'), 'anonymous callers cannot execute the QR submission claim RPC');
+select ok(not has_function_privilege('anon', 'public.claim_public_maintenance_submission(text,uuid,text)', 'execute'), 'anonymous callers cannot execute the QR submission claim RPC');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values
@@ -121,10 +121,8 @@ select throws_ok(
   'tenant B cannot create approved internal work items'
 );
 
-select throws_ok(
-  $$update public.maintenance_requests set unit_id = 'dddddddd-dddd-dddd-dddd-ddddddddddd1' where id = '99999999-9999-9999-9999-999999999991'$$,
-  '42501',
-  null,
+select is_empty(
+  $$update public.maintenance_requests set unit_id = 'dddddddd-dddd-dddd-dddd-ddddddddddd1' where id = '99999999-9999-9999-9999-999999999991' returning id$$,
   'tenant B cannot alter another tenant request scope'
 );
 

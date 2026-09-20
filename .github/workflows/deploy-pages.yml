@@ -36,6 +36,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        run: npm test
+
       - name: Build
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
@@ -47,8 +50,12 @@ jobs:
         with:
           path: dist
 
+  backend:
+    uses: ./.github/workflows/deploy-supabase-functions.yml
+    secrets: inherit
+
   deploy:
-    needs: build
+    needs: [build, backend]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

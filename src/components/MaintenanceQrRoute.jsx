@@ -71,9 +71,13 @@ function PublicMaintenanceForm({ token, scope }) {
   const [recorderMessage, setRecorderMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const successRef = useRef(null);
+  const pendingSubmission = useRef(null);
+  const sendingRef = useRef(false);
+  const [hasPendingSubmission, setHasPendingSubmission] = useState(false);
   const { state: recordingState, recordings, start, stop, removeRecording } = useAudioRecorder({ enabled: true, onMessage: setRecorderMessage });
   const recording = recordings[0] || null;
   const isRecording = recordingState === "recording";
+  const recordingBusy = recordingState !== "idle";
 
   useEffect(() => {
     if (submitted) successRef.current?.focus();
@@ -92,26 +96,39 @@ function PublicMaintenanceForm({ token, scope }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (sendingRef.current || recordingBusy) return;
     if (!description.trim() && !recording && photos.length === 0) {
       setError("Describe the issue or add a photo or voice recording before sending.");
       return;
     }
+    sendingRef.current = true;
     setBusy(true);
     setError("");
     try {
-      await submitPublicMaintenanceRequest({
+      // Keep the exact same payload and ID until the server confirms receipt.
+      // An interrupted response is not evidence that the request wasn't saved.
+      pendingSubmission.current ||= {
         token,
+        submissionId: crypto.randomUUID(),
+        website: new FormData(event.currentTarget).get("website") || "",
         description: description.trim(),
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim(),
         contactPhone: contactPhone.trim(),
         photoFiles: photos,
         audioFile: recording?.file || null,
-      });
+      };
+      setHasPendingSubmission(true);
+      await submitPublicMaintenanceRequest(pendingSubmission.current);
       setSubmitted(true);
     } catch (submissionError) {
+      if ([400, 404, 429].includes(submissionError.status)) {
+        pendingSubmission.current = null;
+        setHasPendingSubmission(false);
+      }
       setError(submissionError.message || "We couldn’t send that request. Please try again.");
     } finally {
+      sendingRef.current = false;
       setBusy(false);
     }
   }
@@ -121,7 +138,7 @@ function PublicMaintenanceForm({ token, scope }) {
       <section className="tenant-qr-card tenant-qr-empty maintenance-success" tabIndex="-1" ref={successRef} aria-labelledby="maintenance-success-title">
         <CheckCircle2 size={32} aria-hidden="true" />
         <h2 id="maintenance-success-title">Your request was received.</h2>
-        <p>The property team has been notified for {scope.propertyName} · {scope.unitName}.</p>
+        <p>Your maintenance request for {scope.propertyName} · {scope.unitName} is saved for the property team to review.</p>
       </section>
     );
   }
@@ -137,6 +154,8 @@ function PublicMaintenanceForm({ token, scope }) {
       <section className="tenant-composer public-maintenance-composer" aria-labelledby="public-maintenance-form-title">
         <h2 id="public-maintenance-form-title">What’s happening?</h2>
         <form onSubmit={handleSubmit}>
+          <fieldset disabled={busy || hasPendingSubmission} className="public-maintenance-inputs">
+          <legend className="visually-hidden">Request details</legend>
           <label htmlFor="public-maintenance-description">
             <span>Describe the issue</span>
             <textarea id="public-maintenance-description" name="description" value={description} onChange={(event) => { setDescription(event.target.value); setError(""); }} rows="5" maxLength="4000" placeholder="For example: the bathroom fan is suddenly very loud." aria-describedby="public-maintenance-description-help" />
@@ -144,8 +163,8 @@ function PublicMaintenanceForm({ token, scope }) {
           <p id="public-maintenance-description-help" className="field-hint">Add a description, photos, or a voice recording. Please include anything urgent, such as an active leak.</p>
 
           <div className="tenant-media-actions">
-            <button type="button" className={isRecording ? "recording" : ""} onClick={isRecording ? stop : start} disabled={busy}>
-              <Mic size={17} aria-hidden="true" /> {isRecording ? "Stop recording" : "Record voice message"}
+            <button type="button" className={isRecording ? "recording" : ""} onClick={isRecording ? stop : start} disabled={busy || (recordingBusy && !isRecording)}>
+              <Mic size={17} aria-hidden="true" /> {isRecording ? "Stop recording" : recordingState === "finalizing" ? "Finishing recording…" : recordingState === "requesting" ? "Opening microphone…" : "Record voice message"}
             </button>
             <label className="tenant-upload-button" htmlFor="public-maintenance-photos">
               <Camera size={17} aria-hidden="true" /> Add photos
@@ -163,8 +182,11 @@ function PublicMaintenanceForm({ token, scope }) {
             <label htmlFor="public-maintenance-phone"><span>Phone</span><input id="public-maintenance-phone" name="phone" type="tel" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} maxLength="50" autoComplete="tel" inputMode="tel" /></label>
           </fieldset>
           <input className="visually-hidden" tabIndex="-1" autoComplete="off" name="website" aria-hidden="true" />
+          </fieldset>
           {error && <p className="maintenance-error" role="alert">{error}</p>}
-          <button type="submit" disabled={busy}>{busy ? "Sending request…" : "Submit request"}</button>
+          {error && hasPendingSubmission && <p className="field-hint">Your details are preserved. Retry to finish this same request.</p>}
+          <button type="submit" disabled={busy || recordingBusy}>{busy ? "Sending request…" : hasPendingSubmission ? "Retry request" : "Submit request"}</button>
+          {recordingBusy && <p className="field-hint" role="status">{isRecording ? "Stop recording before submitting your request." : "Wait for the recording to be ready before submitting."}</p>}
           {busy && <p className="field-hint" role="status">Uploading attachments and sending your request…</p>}
         </form>
       </section>

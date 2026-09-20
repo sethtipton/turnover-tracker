@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, CirclePlus, FileAudio, ListChecks, Mic, RefreshCw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { addItem, loadItems, uploadAttachment } from "../lib/data";
@@ -20,6 +20,7 @@ import { formatBytes, formatDuration, getAttachmentKind } from "../lib/media";
 import { MATERIAL_LABELS } from "../lib/seed";
 import { MaintenanceQrControls } from "./MaintenanceQrControls";
 import { QuickAddPanel } from "./WorkspacePanels";
+import { RequestAttachmentList } from "./TenantMaintenanceApp";
 
 const emptyQuickAddDraft = {
   title: "",
@@ -37,6 +38,8 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [showMaintenanceOverview, setShowMaintenanceOverview] = useState(false);
+  const [detailVersion, setDetailVersion] = useState(0);
+  const refreshSequence = useRef(0);
 
   const propertyUnits = useMemo(() => units.filter((unit) => unit.property_id === selectedPropertyId), [selectedPropertyId, units]);
   const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
@@ -49,13 +52,16 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
   }, [propertyUnits, selectedUnitId]);
 
   const refresh = useCallback(async ({ retain = true } = {}) => {
+    const sequence = ++refreshSequence.current;
     try {
       const all = await loadMaintenanceRequests({ workspaceId: workspace.id });
+      if (sequence !== refreshSequence.current) return;
       const scoped = all.filter((request) => (
         (!selectedPropertyId || request.property_id === selectedPropertyId)
         && (!selectedUnitId || request.unit_id === selectedUnitId)
       ));
       setRequests(scoped);
+      setDetailVersion((current) => current + 1);
       if (scoped.length === 0) setDetail(null);
       const preferredRequests = scoped.filter((request) => request.status !== "resolved");
       setSelectedRequestId((currentId) => (
@@ -70,13 +76,24 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
 
   useEffect(() => { refresh({ retain: false }); }, [refresh]);
   useEffect(() => {
+    function refreshWhenVisible() {
+      if (!busy && document.visibilityState === "visible") refresh();
+    }
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [busy, refresh]);
+  useEffect(() => {
     if (!selectedRequestId) return undefined;
     let active = true;
     loadAdminMaintenanceDetail(selectedRequestId)
       .then((nextDetail) => { if (active) setDetail(nextDetail); })
       .catch((error) => { if (active) setMessage(error.message); });
     return () => { active = false; };
-  }, [selectedRequestId]);
+  }, [selectedRequestId, detailVersion]);
 
   async function handleNewRequest({ description, audioFile, photoFiles }) {
     if (!selectedProperty) return;
@@ -153,7 +170,7 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
       await processMaintenanceRequest(detail.request.id, { forceRetry: true });
       setDetail(await loadAdminMaintenanceDetail(detail.request.id));
       await refresh();
-      setMessage("Analysis retry completed.");
+      setMessage("Analysis completed.");
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -220,6 +237,7 @@ export function MaintenanceWorkspace({ user, workspace, properties, units, initi
       <div className="maintenance-content-grid">
         <nav className="maintenance-case-list" aria-label="Maintenance requests">
           <h3>Open case files</h3>
+          <button className="ghost" type="button" onClick={() => refresh()} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> Refresh inbox</button>
           {openRequests.length === 0 ? <p className="empty">No open maintenance requests in this scope.</p> : <CaseFileList requests={openRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} />}
           {resolvedRequests.length > 0 && <details className="resolved-case-list"><summary>Resolved cases ({resolvedRequests.length})</summary><CaseFileList requests={resolvedRequests} selectedRequestId={selectedRequestId} properties={properties} units={units} onSelect={setSelectedRequestId} /></details>}
         </nav>
@@ -386,13 +404,16 @@ function AdminRequestComposer({ propertyId, unitId, workspaceId, busy, onSubmit,
 
 function AdminCaseFile({ detail, busy, onRetry, onResolve, onItemAction, onAddInformation, onAttachmentLinksChange, message }) {
   const [urls, setUrls] = useState({});
+  const [attachmentError, setAttachmentError] = useState("");
   useEffect(() => {
-    const missing = [...(detail?.attachments || []), ...(detail?.linkedAttachments || [])].filter((attachment) => !urls[attachment.storage_path]);
-    if (missing.length === 0) return;
-    Promise.all(missing.map(async (attachment) => [attachment.storage_path, await getMaintenanceAttachmentUrl(attachment.storage_path)]))
-      .then((entries) => setUrls((current) => ({ ...current, ...Object.fromEntries(entries) })))
-      .catch(() => {});
-  }, [detail, urls]);
+    let active = true;
+    setAttachmentError("");
+    const attachments = [...(detail?.attachments || []), ...(detail?.linkedAttachments || [])];
+    Promise.all(attachments.map(async (attachment) => [attachment.storage_path, await getMaintenanceAttachmentUrl(attachment.storage_path)]))
+      .then((entries) => { if (active) setUrls(Object.fromEntries(entries)); })
+      .catch(() => { if (active) setAttachmentError("Attachments could not be loaded. Refresh the inbox to try again."); });
+    return () => { active = false; };
+  }, [detail]);
 
   if (!detail) return <section className="maintenance-case-file maintenance-case-empty"><ListChecks size={25} aria-hidden="true" /><p>Select a case file to inspect its history and proposed work.</p>{message && <p className="message" role="status">{message}</p>}</section>;
   const { request, entries, attachments, attachmentLinks, childRequests, linkedAttachments, analyses, items, events } = detail;
@@ -417,11 +438,13 @@ function AdminCaseFile({ detail, busy, onRetry, onResolve, onItemAction, onAddIn
         </div>
       </div>
       <div className="case-file-actions">
-        {!isResolved && <button className="ghost" type="button" onClick={onRetry} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> {request.processing_status === "failed" ? "Retry analysis" : "Reanalyze"}</button>}
+        {!isResolved && <button className="ghost" type="button" onClick={onRetry} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> {request.processing_status === "failed" ? "Retry analysis" : analyses.length === 0 ? "Analyze request" : "Reanalyze"}</button>}
         <button className="ghost" type="button" onClick={() => onResolve(isResolved ? "reopen" : "resolve")} disabled={busy}>{isResolved ? "Reopen case" : "Close case"}</button>
       </div>
     </header>
     {request.processing_error && <p className="maintenance-error" role="alert">{request.processing_error}</p>}
+    {attachmentError && <p className="maintenance-error" role="alert">{attachmentError}</p>}
+    <RequestAttachmentList attachments={attachments.filter((attachment) => !(request.source_type === "admin-walkthrough" && childRequests.length > 0 && attachment.kind === "photo"))} urls={urls} />
     {request.source_type === "admin-walkthrough" && <WalkthroughPhotoLinks attachments={attachments} attachmentLinks={attachmentLinks} childRequests={childRequests} urls={urls} busy={busy} onChange={onAttachmentLinksChange} />}
     {request.parent_request_id && <LinkedWalkthroughPhotos attachments={linkedAttachments} urls={urls} />}
     <section className="case-section"><h4>Case history</h4><ol className="case-timeline">{entries.map((entry) => <li key={entry.id}><strong>{entry.entry_type === "audio" ? "Voice recording" : entry.entry_type === "photo" ? "Photo added" : entry.author_type === "tenant" ? "Tenant information" : "Information added"}</strong><p>{entry.transcript || entry.content || "Media attached"}</p></li>)}</ol></section>
