@@ -21,6 +21,10 @@ import { getPropertyImageBySlug } from "../lib/propertyImages";
 import { getPublicListingPath, getPublicRouteFromCurrentPath } from "../lib/routing";
 import { AppFooter } from "./AppFooter";
 import { PropertyImage } from "./PropertyImage";
+import { ListingGallery } from "./ListingGallery";
+import { useListingPhotos } from "../hooks/useListingPhotos";
+import { ListingInquiry } from "./ListingInquiry";
+import { ListingImages } from "./ListingImages";
 import { TenantMaintenanceDialog } from "./TenantMaintenanceApp";
 
 export function PublicSite({ listings, busy, error, onSignIn, authenticated = false, user, tenantUnits = [], onSignOut, tenantPreview = false, previewRoute, onExitPreview }) {
@@ -196,7 +200,8 @@ export function ListingDetail({ listing, preview = false }) {
     listing.lease_term,
     listing.neighborhood,
   ].some((value) => value !== null && value !== undefined && value !== "");
-  const imageSrc = getPropertyImageBySlug(listing.property_slug);
+  const photos = useListingPhotos(listing.unit_id, preview);
+  const imageSrc = photos[0]?.url || getPropertyImageBySlug(listing.property_slug);
   const isLiveListing = isPublicListing(listing);
 
   return (
@@ -205,7 +210,7 @@ export function ListingDetail({ listing, preview = false }) {
       <header className={`public-listing-hero${imageSrc ? " has-image" : ""}`}>
         {imageSrc && (
           <div className="public-listing-hero-media">
-            <PropertyImage src={imageSrc} alt={`Exterior of ${listing.property_name}`} priority />
+            {photos.length ? <ListingGallery key={listing.unit_id} photos={photos} /> : <PropertyImage src={imageSrc} alt={photos[0]?.label || (photos.length ? `Photo of ${listing.property_name}` : `Exterior of ${listing.property_name}`)} priority />}
             <span className={`listing-status listing-status-${listing.listing_status}`}>{getListingStatusLabel(listing.listing_status)}</span>
             {preview && isLiveListing && (
               <span className="listing-live-overlay">
@@ -217,7 +222,7 @@ export function ListingDetail({ listing, preview = false }) {
         <div className="public-listing-hero-content">
           <h1>{title}</h1>
           {listing.display_address && <p className="listing-address"><MapPin size={18} aria-hidden="true" /> {listing.display_address}</p>}
-          <p className="listing-rent">{formatRent(listing)}</p>
+          {formatRent(listing) === "Contact for rent" ? <ListingInquiry listing={listing} /> : <p className="listing-rent">{formatRent(listing)}</p>}
         </div>
       </header>
 
@@ -246,13 +251,14 @@ export function ListingDetail({ listing, preview = false }) {
 
 function ListingCard({ listing, preview = false, priority = false }) {
   const title = listing.listing_headline || `${listing.property_name} ${listing.unit_name}`;
-  const imageSrc = getPropertyImageBySlug(listing.property_slug);
+  const photos = useListingPhotos(listing.unit_id, preview);
+  const imageSrc = photos[0]?.url || getPropertyImageBySlug(listing.property_slug);
   return (
     <li className="public-listing-card">
       <a href={getPublicListingPath(listing.property_slug, listing.unit_slug)}>
         <div className="public-listing-card-media">
           {imageSrc ? (
-            <PropertyImage src={imageSrc} alt={`Exterior of ${listing.property_name}`} priority={priority} />
+            <PropertyImage src={imageSrc} alt={photos[0]?.label || (photos.length ? `Photo of ${listing.property_name}` : `Exterior of ${listing.property_name}`)} priority={priority} />
           ) : (
             <Building2 size={28} aria-label={`Image unavailable for ${listing.property_name}`} />
           )}
@@ -272,7 +278,7 @@ function ListingCard({ listing, preview = false, priority = false }) {
             {listing.full_bathrooms != null && <span>{formatNumber(listing.full_bathrooms)} ba</span>}
             {listing.interior_square_feet != null && <span>{listing.interior_square_feet.toLocaleString()} sq ft</span>}
           </div>
-          <p className="listing-rent">{formatRent(listing)}</p>
+          {formatRent(listing) !== "Contact for rent" && <p className="listing-rent">{formatRent(listing)}</p>}
         </div>
       </a>
       {preview && <p className="preview-card-note">Preview</p>}
@@ -404,6 +410,7 @@ function UnitEditor({ unit, busy, onSave, onSuggestListingField }) {
           <SuggestionField label="Amenities" hint="one per line" name="amenities" value={form.amenities} onChange={change} onBlur={autosave.flush} onSuggest={() => suggest("amenities")} busy={suggestingField === "amenities"} error={suggestionErrorField === "amenities"} multiline rows="4" />
         </div>
       </details>
+      <ListingImages unit={unit} />
     </form>
   );
 }

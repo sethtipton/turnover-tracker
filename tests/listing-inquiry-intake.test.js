@@ -1,0 +1,10 @@
+import {expect,it,vi} from 'vitest';
+import {handleListingInquiry,validateInquiry} from '../supabase/functions/_shared/listing-inquiry.ts';
+const body={id:'cccccccc-1111-4111-8111-111111111111',unitId:'dddddddd-1111-4111-8111-111111111111',name:'Visitor',email:'visitor@example.invalid',message:'Question about rent'};
+const request=(data=body)=>new Request('https://example.invalid',{method:'POST',headers:{'x-forwarded-for':'192.0.2.1'},body:JSON.stringify(data)});
+const config={enabled:'true',rateSecret:'test-secret'};
+it('validates names, email, and message bounds',()=>{expect(()=>validateInquiry({...body,email:'bad\r\nemail'})).toThrow();expect(()=>validateInquiry({...body,message:' '.repeat(5)})).toThrow();expect(()=>validateInquiry({...body,message:'x'.repeat(3001)})).toThrow();});
+it('does not accept submissions while disabled',async()=>{const service={rpc:vi.fn()};expect((await handleListingInquiry(request(),service,{})).status).toBe(503);expect(service.rpc).not.toHaveBeenCalled();});
+it('hashes the IP and submits once without exposing recipient addresses',async()=>{const service={rpc:vi.fn().mockResolvedValue({data:true})};const result=await handleListingInquiry(request(),service,config);expect(await result.json()).toEqual({received:true});expect(service.rpc.mock.calls[0][1].hashed_ip).toMatch(/^[a-f0-9]{64}$/);});
+it.each([['rate_limited',429],['unavailable',503],['submission_conflict',409]])('reports %s safely',async(message,status)=>{const service={rpc:vi.fn().mockResolvedValue({error:{message}})};expect((await handleListingInquiry(request(),service,config)).status).toBe(status);});
+it('does not queue honeypot submissions',async()=>{const service={rpc:vi.fn()};await handleListingInquiry(request({...body,website:'spam'}),service,config);expect(service.rpc).not.toHaveBeenCalled();});

@@ -4,3 +4,9 @@ verify_jwt = false
 [functions.deliver-maintenance-emails]
 # This scheduler-only endpoint verifies its own dedicated secret.
 verify_jwt = false
+
+[functions.submit-listing-inquiry]
+verify_jwt = false
+
+[functions.deliver-listing-inquiries]
+verify_jwt = false

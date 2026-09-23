@@ -511,19 +511,19 @@
   .public-listing-card {
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--color-border);
-    border-block-start: 3px solid var(--color-primary);
     border-radius: var(--radius-panel);
     background: var(--color-surface);
-    transition: border-color 160ms ease;
 
-    &:hover {
-      border-color: var(--color-primary-hover);
+    & .listing-status {
+      border: 0;
     }
 
     & > a {
       display: grid;
-      grid-template-columns: clamp(6.5rem, 28vw, 9.5rem) minmax(0, 1fr);
+      /*grid-template-columns: clamp(6.5rem, 28vw, 9.5rem) minmax(0, 1fr);
+      grid-template-columns: clamp(6.5rem, 22vw, 20rem) minmax(0, 1fr);*/
+      grid-template-columns: 1fr 1fr;
+
       min-height: 100%;
       overflow: clip;
       color: var(--color-text);
@@ -551,7 +551,6 @@
     place-items: center;
     position: relative;
     overflow: hidden;
-    border-inline-end: 1px solid var(--color-border);
     background: var(--color-surface-raised);
     color: var(--color-text-muted);
 
@@ -4728,3 +4727,52 @@ ul.admin-walkthrough-steps {
     border: 1px solid #1b2f23;
   }
 }
+
+.listing-images {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-7) var(--space-7) var(--space-7) var(--space-9);
+}
+.listing-images p { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.listing-images input[type="file"] { max-width: 100%; }
+.listing-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: var(--space-4);
+  list-style: none;
+  padding: 0;
+}
+.listing-image-grid li { min-width: 0; }
+.listing-image-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-control); }
+.listing-image-grid span { display: block; overflow-wrap: anywhere; font-size: var(--font-size-sm); }
+.listing-image-progress { list-style: none; padding: 0; display: grid; gap: var(--space-3); }
+.listing-image-progress li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); overflow-wrap: anywhere; }
+.listing-photo-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block-start: var(--space-3); }
+.listing-image-grid .form-field input { width: 100%; min-width: 0; }
+.listing-gallery { margin-block: var(--space-7); }
+.listing-gallery figure { margin: 0; }
+.listing-gallery figure > img { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: var(--color-surface-raised); }
+.listing-gallery figcaption { padding-block: var(--space-3); color: var(--color-text-muted); }
+.listing-gallery-thumbnails { display: flex; gap: var(--space-3); overflow-x: auto; padding: var(--space-2); }
+.listing-gallery-thumbnails button { flex: 0 0 8rem; padding: 0; overflow: hidden; }
+.listing-gallery-thumbnails button[aria-pressed="true"] { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.listing-gallery-thumbnails img { display: block; width: 100%; height: auto; }
+.public-listing-hero-media .listing-gallery { margin: 0; width: 100%; }
+.public-listing-hero-media:has(.listing-gallery) { display: block; }
+.public-listing-hero-media .listing-gallery figure > img { height: auto; min-height: 0; aspect-ratio: 4 / 3; object-fit: contain; }
+.public-listing-hero-media .listing-gallery-thumbnails img { height: auto; min-height: 0; }
+.public-listing-hero-media .listing-gallery { min-width: 0; }
+@media (max-width: 40rem) {
+  .public-listing-hero.has-image:has(.listing-gallery) { grid-template-columns: minmax(0, 1fr); }
+}
+.listing-inquiry-dialog { width: min(32rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; padding: var(--space-8); border: 0; border-radius: var(--radius-panel); background: var(--color-surface); color: var(--color-text); }
+.listing-inquiry-dialog::backdrop { background: rgb(0 0 0 / .65); }
+.listing-inquiry-dialog h2 { padding-inline-end: 2rem; }
+.listing-inquiry-dialog p { margin-block: var(--space-5); }
+.listing-inquiry-dialog fieldset { border: 0; padding: 0; margin-block: var(--space-5); display: grid; gap: var(--space-5); min-width: 0; }
+.listing-inquiry-dialog label { display: grid; gap: var(--space-2); }
+.listing-inquiry-dialog input,.listing-inquiry-dialog textarea { width: 100%; min-width: 0; }
+.listing-inquiry-dialog .inquiry-trap { position: absolute; left: -10000px; }
+.inquiry-close { position: absolute; right: var(--space-5); top: var(--space-5); }
+.inquiry-link { background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: .2em; }
+.public-listing-card > a { min-height: auto; }
