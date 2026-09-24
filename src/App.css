@@ -4815,3 +4815,11 @@ ul.admin-walkthrough-steps {
 .item-list .milestone-row.status-done h3 { color: var(--color-text); text-decoration: none; opacity: 1; }
 .milestone-menu-actions button { background: transparent; color: var(--color-text); border: 0; }
 .milestone-menu-actions button:hover { background: color-mix(in oklab, var(--milestone-color) 18%, var(--color-surface-raised)); }
+
+/* Compact task/milestone selector; preserve native radio keyboard behavior. */
+.add-form > .task-type-choice { flex: 0 0 100%; }
+.task-type-choice .add-choice-options { flex-direction: row; flex-wrap: nowrap; width: fit-content; max-width: 100%; }
+.task-type-choice .add-choice-option { flex: 0 1 auto; min-height: 2.125rem; padding-inline: 0.75rem; font-size: 0.875rem; }
+@media (pointer: coarse) {
+  .task-type-choice .add-choice-option { min-height: 2.75rem; }
+}

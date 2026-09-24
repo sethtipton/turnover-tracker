@@ -267,7 +267,7 @@ export function QuickAddPanel({
             onClose?.();
           }}
         >
-          {presetKind === "task" && <fieldset className="form-field add-choice-field"><legend>Add a</legend><div className="add-choice-options">{["task", "milestone"].map((kind) => <label className="add-choice-option" key={kind}><input type="radio" name="row-type" value={kind} checked={draft.kind === kind} disabled={busy || Boolean(attachmentFailure)} onChange={() => { clearImage(); onDraftChange({ kind }); }} /><span>{kind === "task" ? "Task" : "Milestone"}</span></label>)}</div></fieldset>}
+          {presetKind === "task" && <fieldset className="form-field add-choice-field task-type-choice"><legend>Add a</legend><div className="add-choice-options">{["task", "milestone"].map((kind) => <label className="add-choice-option" key={kind}><input type="radio" name="row-type" value={kind} checked={draft.kind === kind} disabled={busy || Boolean(attachmentFailure)} onChange={() => { clearImage(); onDraftChange({ kind }); }} /><span>{kind === "task" ? "Task" : "Milestone"}</span></label>)}</div></fieldset>}
           {showKindChoices && (
             <fieldset className="form-field add-choice-field">
               <legend>{isMaintenanceQuickAdd ? "Add a" : "Type"}</legend>
