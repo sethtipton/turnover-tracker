@@ -1,3 +1,4 @@
+import { MilestoneFields } from "./MilestoneFields";
 import { useEffect, useState } from "react";
 import { ChevronDown, CirclePlus, ImagePlus, Info, Mic, Plus, Search, Wrench, X } from "lucide-react";
 import { formatBytes, formatDuration } from "../lib/media";
@@ -208,8 +209,8 @@ export function QuickAddPanel({
   const isMaintenanceQuickAdd = variant === "maintenance";
   const showKindChoices = !presetKind;
   const showMaterialChoices = draft.kind === "material" && !presetMaterialType;
-  const itemLabel = draft.kind === "material" ? "Material" : isMaintenanceQuickAdd || inline ? "Task" : "Item";
-  const itemPlaceholder = draft.kind === "material"
+  const itemLabel = draft.kind === "milestone" ? "Milestone" : draft.kind === "material" ? "Material" : isMaintenanceQuickAdd || inline ? "Task" : "Item";
+  const itemPlaceholder = draft.kind === "milestone" ? "For example, Take pictures" : draft.kind === "material"
     ? draft.material_type === "collect"
       ? "What needs to be collected or brought?"
       : "What needs to be purchased?"
@@ -256,7 +257,7 @@ export function QuickAddPanel({
         <form
           className={`add-form${draft.kind === "material" ? " has-material-type" : ""}${presetKind ? " has-preset-type" : ""}`}
           onSubmit={async (event) => {
-            const result = await onSubmit(event, imageFile);
+            const result = await onSubmit(event, draft.kind === "milestone" ? null : imageFile);
             if (!result) return;
             if (result.attachmentError) {
               setAttachmentFailure(result);
@@ -266,6 +267,7 @@ export function QuickAddPanel({
             onClose?.();
           }}
         >
+          {presetKind === "task" && <fieldset className="form-field add-choice-field"><legend>Add a</legend><div className="add-choice-options">{["task", "milestone"].map((kind) => <label className="add-choice-option" key={kind}><input type="radio" name="row-type" value={kind} checked={draft.kind === kind} disabled={busy || Boolean(attachmentFailure)} onChange={() => { clearImage(); onDraftChange({ kind }); }} /><span>{kind === "task" ? "Task" : "Milestone"}</span></label>)}</div></fieldset>}
           {showKindChoices && (
             <fieldset className="form-field add-choice-field">
               <legend>{isMaintenanceQuickAdd ? "Add a" : "Type"}</legend>
@@ -338,6 +340,7 @@ export function QuickAddPanel({
               autoFocus={inline}
             />
           </label>
+          {draft.kind === "milestone" && <MilestoneFields date={draft.milestone_date} onChange={onDraftChange} />}
           <label className="form-field" htmlFor="new-item-note">
             <span>{isMaintenanceQuickAdd ? "Details" : "Note"} <span className="optional-label">optional</span></span>
             <input
@@ -349,7 +352,7 @@ export function QuickAddPanel({
               maxLength="500"
             />
           </label>
-          <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor={`${panelId}-image`} title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
+          {draft.kind !== "milestone" && <label className={`add-image-button${imageFile ? " is-selected" : ""}`} htmlFor={`${panelId}-image`} title={imageFile ? `${imageFile.name} selected` : "Attach photo"}>
             <ImagePlus size={18} aria-hidden="true" />
             <span>Add Image</span>
             <input
@@ -364,8 +367,8 @@ export function QuickAddPanel({
                 setImageFile(event.target.files?.[0] || null);
               }}
             />
-          </label>
-          {imageFile && <div className="quick-add-image-preview" role="status">
+          </label>}
+          {imageFile && draft.kind !== "milestone" && <div className="quick-add-image-preview" role="status">
             {imagePreviewUrl && <img src={imagePreviewUrl} alt="Selected photo preview" />}
             <span><strong>Photo ready</strong><small>{imageFile.name || "Camera photo"} · {formatBytes(imageFile.size)}</small></span>
             <button className="icon-button" type="button" onClick={clearImage} aria-label="Remove selected photo"><X size={16} aria-hidden="true" /></button>

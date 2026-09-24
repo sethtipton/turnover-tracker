@@ -68,6 +68,7 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage, onIt
         category: draft.kind === "material" ? MATERIAL_LABELS[draft.material_type] : "Task",
         note: draft.note.trim(),
         kind: draft.kind,
+        ...(draft.kind === "milestone" ? { milestone_date: draft.milestone_date || null } : {}),
         material_type: draft.kind === "material" ? draft.material_type : null,
         status: "approved",
         sort_order: getNextQueueSortOrder(items, draft),
@@ -135,6 +136,7 @@ export function useScopeItems({ workspaceId, propertyId, unitId, onMessage, onIt
 
   async function saveItem(item, patch) {
     const nextPatch = {
+      ...(item.kind === "milestone" ? { milestone_date: patch.milestone_date || null } : {}),
       title: patch.title?.trim(),
       note: patch.note?.trim() || "",
       status: patch.status,
@@ -287,7 +289,7 @@ function getStatusLabel(status) {
 function getNextQueueSortOrder(items, draft) {
   const matchingItems = items.filter((item) => (
     !item.archived_at
-    && item.kind === draft.kind
+    && (["task", "milestone"].includes(draft.kind) ? ["task", "milestone"].includes(item.kind) : item.kind === draft.kind)
     && (item.kind !== "material" || item.material_type === draft.material_type)
   ));
   const firstSortOrder = Math.min(0, ...matchingItems.map((item) => item.sort_order || 0));

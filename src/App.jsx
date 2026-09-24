@@ -61,6 +61,7 @@ const emptyDraft = {
   title: "",
   note: "",
   kind: "task",
+  milestone_date: "",
   material_type: "shopping",
 };
 
@@ -440,8 +441,9 @@ function App() {
   const reviewItems = activeScopeItems.filter((item) => item.status === "pending-review" && item.kind !== "dictation");
   const activeItems = filteredItems.filter((item) => item.status !== "pending-review");
   const taskItems = workMode
-    ? activeScopeItems.filter((item) => item.status === "approved" && item.kind === "task")
-    : activeItems.filter((item) => item.kind === "task");
+    ? activeScopeItems.filter((item) => ["task", "milestone"].includes(item.kind) && (item.status === "approved" || item.kind === "milestone"))
+    : activeItems.filter((item) => ["task", "milestone"].includes(item.kind));
+  const activeTaskItemCount = taskItems.filter((item) => item.kind === "task" && item.status !== "done").length;
   const shoppingItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "shopping");
   const collectItems = activeItems.filter((item) => item.kind === "material" && item.material_type === "collect");
   const activeCollectItemCount = collectItems.filter((item) => item.status !== "done").length;
@@ -670,7 +672,7 @@ function App() {
   }
 
   async function handleDeleteItem(item) {
-    if (!window.confirm(`Delete "${item.title}" and its attachments?`)) return;
+    if (!window.confirm(item.kind === "milestone" ? `Delete milestone "${item.title}"? Surrounding tasks will stay.` : `Delete "${item.title}" and its attachments?`)) return;
     await removeItem(item, `${item.title} deleted.`);
   }
 
@@ -781,7 +783,7 @@ function App() {
           mediaUrls={mediaUrls}
           openRequest={openRequests.review}
         />}
-        <ItemColumn title="Tasks" tone="task" items={taskItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} quickAddOpen={addWorkTarget === "tasks"} onQuickAdd={!compact ? () => handleColumnQuickAdd("tasks") : undefined} quickAddPanel={!compact ? renderColumnQuickAdd("tasks", "tasks-items-quick-add") : null} quickAddPanelId="tasks-items-quick-add" enteringItemIds={enteringItemIds} />
+        <ItemColumn title="Tasks" tone="task" items={taskItems} itemCount={activeTaskItemCount} itemCountLabel={`${activeTaskItemCount} unfinished tasks`} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} forceOpen={compact} compact={compact} openRequest={openRequests.tasks} reorderable={!compact && !query && statusFilter === "all"} onReorder={reorderItems} quickAddOpen={addWorkTarget === "tasks"} onQuickAdd={!compact ? () => handleColumnQuickAdd("tasks") : undefined} quickAddPanel={!compact ? renderColumnQuickAdd("tasks", "tasks-items-quick-add") : null} quickAddPanelId="tasks-items-quick-add" enteringItemIds={enteringItemIds} />
         {!compact && (
           <div className="materials-row">
             <ItemColumn title="Shopping List" tone="shopping" items={shoppingItems} onItemChange={saveItem} onStatus={changeStatus} onDelete={handleDeleteItem} onUpload={uploadFiles} onDeleteAttachment={handleDeleteAttachment} onArchive={archiveItem} mediaUrls={mediaUrls} openRequest={openRequests.shopping} quickAddOpen={addWorkTarget === "shopping"} onQuickAdd={() => handleColumnQuickAdd("shopping")} quickAddPanel={renderColumnQuickAdd("shopping", "shopping-list-items-quick-add")} enteringItemIds={enteringItemIds} />

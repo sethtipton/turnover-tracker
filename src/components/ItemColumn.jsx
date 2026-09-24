@@ -1,6 +1,7 @@
+import { MilestoneFields } from "./MilestoneFields";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Flag, MoreHorizontal, Archive, ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { STATUS_LABELS } from "../lib/seed";
 
 export function ItemColumn({
@@ -45,11 +46,12 @@ export function ItemColumn({
   }
 
   function handleItemChange(item, patch) {
+    if (item.kind === "milestone") return onItemChange(item, patch);
     const isNewlyDone = item.status !== "done" && patch.status === "done";
     runItemTransition(() => onItemChange(item, patch), isNewlyDone);
   }
 
-  const reorderableItems = orderedItems.filter((item) => item.status !== "done");
+  const reorderableItems = orderedItems.filter((item) => (item.kind === "milestone" || item.status !== "done"));
 
   function applyOrder(nextItems) {
     if (nextItems.every((item, index) => item.id === reorderableItems[index]?.id)) return;
@@ -181,7 +183,7 @@ export function ItemColumn({
               onUpload={onUpload}
               onDeleteAttachment={onDeleteAttachment}
               onArchive={onArchive}
-              canReorder={reorderable && item.status !== "done"}
+              canReorder={reorderable && (item.kind === "milestone" || item.status !== "done")}
               isDragging={draggingId === item.id}
               isDragOver={dragOverId === item.id && draggingId !== item.id}
               isEntering={enteringItemIds.has(item.id)}
@@ -251,7 +253,7 @@ function ItemCard({
 
   return (
     <li
-      className={`item-card ${itemTypeClass} status-${item.status}${canReorder ? " is-reorderable" : ""}${isDragging ? " is-dragging" : ""}${isDragOver ? " is-drag-over" : ""}${isEntering ? " is-entering" : ""}`}
+      className={`item-card ${item.kind === "milestone" ? "milestone-row" : itemTypeClass} status-${item.status}${canReorder ? " is-reorderable" : ""}${isDragging ? " is-dragging" : ""}${isDragOver ? " is-drag-over" : ""}${isEntering ? " is-entering" : ""}`}
       style={{ viewTransitionName: `item-${item.id}` }}
       data-reorder-item-id={canReorder ? item.id : undefined}
       draggable={canReorder}
@@ -261,6 +263,7 @@ function ItemCard({
       onDrop={canReorder ? onDrop : undefined}
       onDragEnd={canReorder ? onDragEnd : undefined}
     >
+      {item.kind === "milestone" ? <MilestoneContent item={item} onSave={onItemChange} onDelete={onDelete} onStatus={onStatus} canReorder={canReorder} canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} dragProps={{ onPointerDown: onPointerDragStart, onPointerMove: onPointerDragMove, onPointerUp: onPointerDragEnd, onPointerCancel: onPointerDragCancel }} /> : <>
       <div className="item-main">
         <EditableItem
           item={item}
@@ -291,8 +294,42 @@ function ItemCard({
         />
       )}
       {!compact && <AttachmentList attachments={item.attachments} mediaUrls={mediaUrls} onDelete={onDeleteAttachment} />}
+      </>}
     </li>
   );
+}
+
+function MilestoneContent({ item, onSave, onDelete, onStatus, canReorder, canMoveUp, canMoveDown, onMoveUp, onMoveDown, dragProps }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item);
+  const [saving, setSaving] = useState(false);
+  const menuRef = useRef(null);
+  const summaryRef = useRef(null);
+  function closeMenu() { if (menuRef.current) menuRef.current.open = false; summaryRef.current?.focus(); }
+  function edit() { setDraft(item); setEditing(true); closeMenu(); }
+  return <>
+    <div className="milestone-heading">
+      <Flag size={22} aria-hidden="true" />
+      <div><h3>{item.title}</h3>{item.milestone_date && <time dateTime={item.milestone_date}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${item.milestone_date}T12:00:00`))}</time>}{item.status === "done" && <span className="milestone-reached"><Check size={15} aria-hidden="true" /> Reached</span>}{item.note && <p>{item.note}</p>}</div>
+    </div>
+    <div className="milestone-controls">
+      {canReorder && <><button type="button" className="icon-button item-drag-handle" aria-label={`Drag ${item.title} to reorder`} {...dragProps}><GripVertical size={17} aria-hidden="true" /></button><button type="button" className="icon-button" aria-label={`Move ${item.title} up`} disabled={!canMoveUp} onClick={onMoveUp}><ArrowUp size={17} aria-hidden="true" /></button><button type="button" className="icon-button" aria-label={`Move ${item.title} down`} disabled={!canMoveDown} onClick={onMoveDown}><ArrowDown size={17} aria-hidden="true" /></button></>}
+      <details className="milestone-menu" ref={menuRef} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMenu(); } }}>
+        <summary ref={summaryRef} aria-label={`Options for ${item.title}`}><MoreHorizontal size={20} aria-hidden="true" /></summary>
+        <div className="milestone-menu-actions">
+          <button type="button" onClick={edit}>Edit milestone</button>
+          <button type="button" onClick={() => { closeMenu(); onStatus(item, item.status === "done" ? "approved" : "done"); }}>{item.status === "done" ? "Mark not reached" : "Mark reached"}</button>
+          <button type="button" onClick={() => { closeMenu(); onDelete(item); }}>Delete milestone</button>
+        </div>
+      </details>
+    </div>
+    {editing && <form className="milestone-editor" onSubmit={async (event) => { event.preventDefault(); if (!draft.title.trim() || saving) return; setSaving(true); try { const saved = await onSave(item, draft); if (saved) { setEditing(false); summaryRef.current?.focus(); } } finally { setSaving(false); } }}>
+      <label className="form-field"><span>Milestone</span><input name="title" value={draft.title} required maxLength={140} autoFocus onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+      <MilestoneFields date={draft.milestone_date} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+      <label className="form-field"><span>Note (optional)</span><input name="note" value={draft.note || ""} maxLength={500} onChange={(event) => setDraft({ ...draft, note: event.target.value })} /></label>
+      <div className="milestone-editor-actions"><button type="submit" disabled={saving}>{saving ? "Saving…" : "Save milestone"}</button><button type="button" disabled={saving} onClick={() => { setEditing(false); summaryRef.current?.focus(); }}>Cancel</button></div>
+    </form>}
+  </>;
 }
 
 function ItemActions({ item, isEditing, onEdit, onStatus, onDelete, onArchive, canReorder, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onPointerDragStart, onPointerDragMove, onPointerDragEnd, onPointerDragCancel }) {
@@ -552,7 +589,7 @@ function getItemEditDraft(item) {
 
 function sortItemsForDisplay(items) {
   return [...items].sort((first, second) => {
-    const statusDifference = Number(first.status === "done") - Number(second.status === "done");
+    const statusDifference = Number(first.status === "done" && first.kind !== "milestone") - Number(second.status === "done" && second.kind !== "milestone");
     if (statusDifference !== 0) return statusDifference;
 
     const orderDifference = (first.sort_order || 0) - (second.sort_order || 0);
